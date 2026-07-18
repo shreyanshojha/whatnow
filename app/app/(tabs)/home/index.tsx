@@ -54,12 +54,20 @@ export default function MoodScreen() {
     setMood(id);
     setFreeformDescription(''); // a real mood tile always wins over stale freeform text
     setOtherOpen(false);
+    setShowCrisisNotice(false); // switching to a normal mood tile clears any lingering notice
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
     }
   };
 
   const proceedWithFreeform = (text: string) => {
+    // Always clear this here — the one place every "actually move forward"
+    // path runs through, whether that's a direct non-crisis submit or
+    // tapping "See activity ideas anyway" on the crisis notice. Without
+    // this, editing the text to remove concerning language and resubmitting
+    // left the notice stuck showing (with nothing left to dismiss it) on
+    // every future visit to this screen.
+    setShowCrisisNotice(false);
     const matched = matchMoodFromText(text);
     setMood(matched);
     setFreeformDescription(text);
@@ -72,8 +80,10 @@ export default function MoodScreen() {
     if (!text) return;
     // A caring pause, not a gate: if this reads like a crisis, say something
     // human first, but never trap the person — "see ideas anyway" is always
-    // right there.
+    // right there. Collapses the freeform box so the notice is the one clear
+    // thing on screen instead of both showing at once.
     if (checkForCrisisLanguage(text)) {
+      setOtherOpen(false);
       setShowCrisisNotice(true);
       return;
     }

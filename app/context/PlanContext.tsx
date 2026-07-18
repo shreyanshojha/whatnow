@@ -604,13 +604,26 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
    * see lib/places.ts's searchPlace for the search itself and the "Search a
    * place instead" flow on the context screen for the UI. */
   const setManualLocation = useCallback(
-    async (lat: number, lon: number, radius: SearchRadius): Promise<void> => {
-      setLocationStatus('loading');
-      try {
-        await applyResolvedLocation(lat, lon, RADIUS_METERS[radius]);
-      } catch {
-        setLocationStatus('unavailable');
-      }
+    (lat: number, lon: number, radius: SearchRadius): Promise<void> => {
+      // Registered in locationPromiseRef exactly like requestLocation, so a
+      // "Make my plan" tap that lands while this is still resolving waits
+      // for it instead of racing it — see awaitPendingLocation above. Without
+      // this, tapping a search result and immediately tapping "Make my plan"
+      // could silently build that one plan from stale (null) nearby data.
+      const p = (async () => {
+        setLocationStatus('loading');
+        try {
+          await applyResolvedLocation(lat, lon, RADIUS_METERS[radius]);
+        } catch {
+          setLocationStatus('unavailable');
+        }
+      })();
+
+      locationPromiseRef.current = p;
+      p.finally(() => {
+        if (locationPromiseRef.current === p) locationPromiseRef.current = null;
+      });
+      return p;
     },
     [applyResolvedLocation]
   );
@@ -632,10 +645,16 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     (activity: Activity) => {
       const savedMood = mood ?? activity.moods[0];
       let savedAt = 0;
+      // Captured from the same `prev` the state update itself uses, inside
+      // the updater closure — not from savedRef (which only catches up via a
+      // separate effect a commit later). A rapid save→unsave→save on the
+      // same activity previously risked reading a one-commit-stale ref here
+      // and taking the wrong schedule/cancel branch below.
+      let existedBefore = false;
       setSaved((prev) => {
-        const exists = prev.some((s) => s.activity.id === activity.id);
+        existedBefore = prev.some((s) => s.activity.id === activity.id);
         savedAt = Date.now();
-        const next = exists
+        const next = existedBefore
           ? prev.filter((s) => s.activity.id !== activity.id)
           : [...prev, { activity, mood: savedMood, savedAt }];
         persistSaved(next);
@@ -644,8 +663,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       // Saving is a clear, deliberate positive signal — unsaving isn't treated
       // as a negative one (people tidy up saved lists for lots of reasons
       // unrelated to "I didn't like this").
-      const alreadySaved = savedRef.current.some((s) => s.activity.id === activity.id);
-      if (!alreadySaved) {
+      if (!existedBefore) {
         recordAccepted(activity.id, savedMood).catch(() => {});
         syncSaveActivity(activity, savedMood).catch(() => {});
         // A courtesy local nudge in case this person never reopens the app

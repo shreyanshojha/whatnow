@@ -56,17 +56,22 @@ export default function ContextScreen() {
   const [manualCandidates, setManualCandidates] = React.useState<PlaceCandidate[] | null>(null);
   const [manualSearching, setManualSearching] = React.useState(false);
   const [manualApplying, setManualApplying] = React.useState(false);
+  // Bumped on every search, so a slower earlier request can't clobber a
+  // newer one's results if two searches ever overlap (e.g. the keyboard's
+  // "search" key fired twice in quick succession before the first resolved).
+  const manualSearchSeq = React.useRef(0);
 
   const onManualSearch = async () => {
     const q = manualQuery.trim();
-    if (!q) return;
+    if (!q || manualSearching) return;
+    const seq = ++manualSearchSeq.current;
     setManualSearching(true);
     setManualCandidates(null);
     try {
       const results = await searchPlace(q);
-      setManualCandidates(results);
+      if (seq === manualSearchSeq.current) setManualCandidates(results);
     } finally {
-      setManualSearching(false);
+      if (seq === manualSearchSeq.current) setManualSearching(false);
     }
   };
 

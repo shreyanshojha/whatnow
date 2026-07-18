@@ -126,11 +126,24 @@ async function ensurePermission(): Promise<boolean> {
 
 /** Schedules the one-time local nudge for a freshly saved activity. A pure
  * courtesy on top of the in-app card — if permission isn't granted, or
- * scheduling fails for any reason, saving still works exactly as before. */
+ * scheduling fails for any reason, saving still works exactly as before.
+ *
+ * Self-contained: always cancels any notification already pending for this
+ * same activity id before scheduling a new one. A rapid save→unsave→save on
+ * the same card calls this and cancelCompletionNotification back-to-back
+ * without any external ordering guarantee — without this, a stale
+ * "did this happen" notification could survive an unsave and fire ~5 hours
+ * later for something no longer even saved. */
 export async function scheduleCompletionNotification(entry: SavedEntry): Promise<void> {
   try {
     const granted = await ensurePermission();
     if (!granted) return;
+
+    const ids = await readNotifIds();
+    const existingId = ids[entry.activity.id];
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
+    }
 
     const id = await Notifications.scheduleNotificationAsync({
       content: {
@@ -144,7 +157,6 @@ export async function scheduleCompletionNotification(entry: SavedEntry): Promise
       },
     });
 
-    const ids = await readNotifIds();
     ids[entry.activity.id] = id;
     await writeNotifIds(ids);
   } catch {
