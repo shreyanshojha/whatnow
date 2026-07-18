@@ -15,6 +15,19 @@ already configured in `app/app.json`. There is no company-wide "AI API key" to s
 planning and live events are bring-your-own-key per person using the app, so nothing to
 provision on your end for that to work as designed.
 
+Most recently added, directly from your feedback: suggestions now name a real, distance-ranked
+nearby place instead of being vague ("walk to Riverside Park," not "take a walk"), and the AI
+prompt now requires concrete objects generally, not just places. A "Your patterns" card (About
+screen) shows plans made, streak, and thumbs-up count from data already being collected — no
+new tracking. A freeform "None of these — let me tell you" input lets someone type exactly how
+they feel instead of picking from 12 tiles, mapped locally to the closest bucket for the
+existing engine while the raw text gets real weight in the AI prompt. A lightweight completion
+check-in asks, the next time the app opens 3 hours to 5 days after a save, whether it actually
+happened. And — the one addition that mattered most from a simulated UX pass (see
+`UX_RESEARCH_SIMULATION.md`) — a local, keyword-based safety net now shows a caring note with
+crisis-line info if the freeform input reads like real distress, without ever blocking someone
+from continuing to activity ideas.
+
 ## 1. Push the code somewhere (free, 5 minutes)
 
 The repo is currently local-only (no git remote). Push it to GitHub (or GitLab/Bitbucket) —
@@ -91,7 +104,28 @@ Both stores will ask for:
   activities, thumbs-up/down feedback), and precise/approximate location (optional, user-
   granted). All of this is spelled out for reference in `PRIVACY.md`.
 
-## 8. Decide what "done" looks like before a public launch
+## 8. What's still genuinely missing (not guessed away, not fixed by reasoning alone)
+
+A simulated UX research pass (`UX_RESEARCH_SIMULATION.md` — persona walkthroughs of the real
+screens, since recruiting actual UX experts and 30-40 real testers isn't possible in this
+environment) surfaced one thing worth fixing immediately (done — the crisis-language safety
+net above) and a few things that genuinely need real people, not more reasoning:
+
+- **The completion check-in only fires on a later app open.** Someone who saves an activity
+  and never reopens the app never gets asked whether it happened. Fully closing this needs
+  push notifications, which is a real scope/cost decision for you to make, not a quick fix.
+- **Copy and tone haven't been checked against a non-native English speaker or an older user
+  in real life** — idiom-heavy microcopy like "None of these — let me tell you" reads fine to
+  me on paper, which is exactly why it needs a real second opinion, not another guess.
+- **Whether a first-time explainer of the learning loop would help** ("the more you use this,
+  the more it learns what works for you") before the new "Your patterns" card has any data to
+  show is genuinely an open question — a handful of real first-opens would answer it faster
+  than any amount of further thinking.
+- **The real thing this all points back to:** a small closed beta (10-20 people, a couple of
+  weeks — see §9 below) is still the right next step. This session's simulated pass is a
+  reasonable substitute for zero testing, not a substitute for real testing.
+
+## 9. Decide what "done" looks like before a public launch
 
 A few product questions worth answering deliberately rather than by default, now that
 accounts and learning are real:
