@@ -14,7 +14,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.bg },
         headerShadowVisible: false,
         headerTintColor: colors.ink,
-        headerTitleStyle: { fontWeight: '700' as const },
+        headerTitleStyle: { ...font.bold, fontSize: 17 },
         tabBarActiveTintColor: colors.coralDeep,
         tabBarInactiveTintColor: colors.inkFaint,
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.line },

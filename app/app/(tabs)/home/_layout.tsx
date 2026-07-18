@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import React from 'react';
-import { colors } from '../../../lib/theme';
+import { font, colors } from '../../../lib/theme';
 
 /** The mood → context → plan flow, nested inside the Home tab so the tab
  * bar (Home/Saved/About) stays visible the whole way through — Saved and
@@ -12,7 +12,7 @@ export default function HomeStackLayout() {
         headerStyle: { backgroundColor: colors.bg },
         headerShadowVisible: false,
         headerTintColor: colors.ink,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { ...font.bold, fontSize: 17 },
         contentStyle: { backgroundColor: colors.bg },
         headerBackButtonDisplayMode: 'minimal',
       }}

@@ -255,10 +255,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: radius.pill,
   },
-  catEmo: { fontSize: 13 },
   catLabel: { fontSize: 12, ...font.bold, letterSpacing: 0.3 },
   saveBtn: { padding: 2 },
-  heart: { fontSize: 26, color: colors.inkFaint, lineHeight: 28 },
   title: {
     fontSize: 20,
     ...fontDisplay.bold,
@@ -266,7 +264,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginBottom: 5,
   },
-  desc: { fontSize: 15, color: colors.inkSoft, lineHeight: 21, marginBottom: 14 },
+  desc: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 21, marginBottom: 14 },
   why: { borderRadius: radius.md, padding: 13, marginBottom: 12 },
   whyLabel: {
     fontSize: 11,
@@ -275,9 +273,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  whyText: { fontSize: 14.5, color: colors.ink, lineHeight: 20 },
+  whyText: { fontSize: 14.5, color: colors.ink, ...font.regular, lineHeight: 20 },
   tipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  tip: { flex: 1, fontSize: 13.5, color: colors.inkSoft },
+  tip: { flex: 1, fontSize: 13.5, color: colors.inkSoft, ...font.regular },
   tipStrong: { ...font.semibold, color: colors.ink },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
@@ -302,7 +300,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  feedbackLabel: { flex: 1, fontSize: 12.5, color: colors.inkFaint },
+  feedbackLabel: { flex: 1, fontSize: 12.5, color: colors.inkFaint, ...font.regular },
   feedbackBtns: { flexDirection: 'row', gap: 8 },
   feedbackBtn: {
     width: 30,

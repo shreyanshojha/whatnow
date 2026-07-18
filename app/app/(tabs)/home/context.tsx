@@ -196,7 +196,10 @@ export default function ContextScreen() {
           accessibilityRole="button"
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         >
-          <Text style={styles.ctaText}>Make my plan  →</Text>
+          <View style={styles.ctaRow}>
+            <Text style={styles.ctaText}>Make my plan</Text>
+            <Icon name="arrow-right" size={17} color={colors.white} strokeWidth={2.1} />
+          </View>
         </Pressable>
       </View>
     </View>
@@ -217,7 +220,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 16,
   },
-  moodPillEmo: { fontSize: 15 },
   moodPillText: {
     fontSize: 13.5,
     ...font.semibold,
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     marginBottom: 6,
   },
-  sub: { fontSize: 15, color: colors.inkSoft, lineHeight: 21, marginBottom: 22 },
+  sub: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 21, marginBottom: 22 },
   kidsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   weatherRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  weatherBody: { flex: 1, fontSize: 14.5, color: colors.inkSoft, lineHeight: 21 },
+  weatherBody: { flex: 1, fontSize: 14.5, color: colors.inkSoft, ...font.regular, lineHeight: 21 },
   weatherPlace: { fontSize: 13.5, color: colors.ink, ...font.medium },
   weatherBtn: {
     marginTop: 12,
@@ -298,5 +300,6 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   ctaPressed: { backgroundColor: colors.coralDeep },
+  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   ctaText: { color: colors.white, fontSize: 17, ...font.bold },
 });

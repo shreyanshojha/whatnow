@@ -1,6 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { CatId, MoodId } from '../data/activities';
+import { colors } from '../lib/theme';
 
 /**
  * WhatNow's custom line-icon system — replaces every emoji in the product
@@ -55,6 +56,7 @@ export type IconName =
   | 'log-out'
   | 'trash'
   | 'arrow-right'
+  | 'arrow-left'
   | 'shield';
 
 interface IconProps {
@@ -71,7 +73,7 @@ const ALIAS: Partial<Record<IconName, IconName>> = {
   'venue-library': 'learn',
 };
 
-export function Icon({ name, size = 24, color = '#221C18', strokeWidth = 1.75 }: IconProps) {
+export function Icon({ name, size = 24, color = colors.ink, strokeWidth = 1.75 }: IconProps) {
   const resolved = ALIAS[name] ?? name;
   const s = { stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' as const };
 
@@ -487,6 +489,13 @@ function draw(name: IconName, s: StrokeProps, color: string) {
         <>
           <Line {...s} x1="3.5" y1="12" x2="19.5" y2="12" />
           <Path {...s} d="M14 6.5 20 12l-6 5.5" />
+        </>
+      );
+    case 'arrow-left':
+      return (
+        <>
+          <Line {...s} x1="20.5" y1="12" x2="4.5" y2="12" />
+          <Path {...s} d="M10 6.5 4 12l6 5.5" />
         </>
       );
     case 'shield':

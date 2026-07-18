@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, IconName } from './Icon';
-import { colors, radius, font } from '../lib/theme';
+import { colors, font, radius, shadow } from '../lib/theme';
 
 export interface SegOption<T> {
   val: T;
@@ -91,11 +91,10 @@ const styles = StyleSheet.create({
   },
   segActive: {
     backgroundColor: colors.white,
-    shadowColor: '#4A3226',
+    ...shadow.soft,
     shadowOpacity: 0.14,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   segPressed: { opacity: 0.7 },
   ic: { fontSize: 15 },

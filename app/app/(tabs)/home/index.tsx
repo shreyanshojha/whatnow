@@ -97,7 +97,10 @@ export default function MoodScreen() {
             pressed && mood && styles.ctaPressed,
           ]}
         >
-          <Text style={styles.ctaText}>Next  →</Text>
+          <View style={styles.ctaRow}>
+            <Text style={styles.ctaText}>Next</Text>
+            <Icon name="arrow-right" size={17} color={colors.white} strokeWidth={2.1} />
+          </View>
         </Pressable>
       </View>
     </View>
@@ -128,7 +131,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 8,
   },
-  sub: { fontSize: 15.5, color: colors.inkSoft, lineHeight: 22, marginBottom: 22 },
+  sub: { fontSize: 15.5, color: colors.inkSoft, ...font.regular, lineHeight: 22, marginBottom: 22 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -148,7 +151,6 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   moodPressed: { opacity: 0.75, transform: [{ scale: 0.97 }] },
-  moodEmo: { fontSize: 34 },
   moodWord: {
     fontSize: 14,
     ...font.semibold,
@@ -176,6 +178,7 @@ const styles = StyleSheet.create({
   footerHintFaint: {
     fontSize: 14,
     color: colors.inkFaint,
+    ...font.regular,
     marginBottom: 10,
     textAlign: 'center',
   },
@@ -186,7 +189,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadow.soft,
   },
-  ctaDisabled: { backgroundColor: '#EAD9CD' },
+  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  ctaDisabled: { backgroundColor: colors.line },
   ctaPressed: { backgroundColor: colors.coralDeep },
   ctaText: { color: colors.white, fontSize: 17, ...font.bold },
 });

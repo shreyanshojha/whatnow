@@ -79,7 +79,7 @@ export default function SavedScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 10 },
-  sub: { fontSize: 15, color: colors.inkSoft, marginBottom: 16 },
+  sub: { fontSize: 15, color: colors.inkSoft, ...font.regular, marginBottom: 16 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   itemBody: { flex: 1 },
   itemTitle: { fontSize: 15.5, ...font.semibold, color: colors.ink, lineHeight: 20 },
-  itemMeta: { fontSize: 12.5, color: colors.inkFaint, marginTop: 2 },
+  itemMeta: { fontSize: 12.5, color: colors.inkFaint, ...font.regular, marginTop: 2 },
   remove: {
     backgroundColor: colors.bg2,
     borderRadius: radius.pill,
@@ -117,11 +117,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 34,
   },
-  emptyEmo: { fontSize: 46, marginBottom: 12 },
   emptyH: { fontSize: 20, ...fontDisplay.bold, color: colors.ink, marginBottom: 8 },
   emptyP: {
     fontSize: 15,
     color: colors.inkSoft,
+    ...font.regular,
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 22,

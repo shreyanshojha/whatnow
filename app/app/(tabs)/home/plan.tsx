@@ -116,9 +116,10 @@ export default function PlanScreen() {
           </Text>
           <Pressable
             onPress={() => router.back()}
-            style={({ pressed }) => [styles.ghost, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.ghostRow, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.ghostText}>← Adjust details</Text>
+            <Icon name="arrow-left" size={14} color={colors.inkSoft} strokeWidth={2} />
+            <Text style={styles.ghostText}>Adjust details</Text>
           </Pressable>
         </View>
       ) : (
@@ -146,7 +147,10 @@ export default function PlanScreen() {
             accessibilityRole="button"
             style={({ pressed }) => [styles.reshuffle, pressed && styles.reshufflePressed]}
           >
-            <Text style={styles.reshuffleText}>↻  Reshuffle</Text>
+            <View style={styles.reshuffleRow}>
+              <Icon name="reset" size={17} color={colors.coralDeep} strokeWidth={1.9} />
+              <Text style={styles.reshuffleText}>Reshuffle</Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={() => router.push('/saved')}
@@ -372,14 +376,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     lineHeight: 32,
   },
-  sum: { fontSize: 15, color: colors.inkSoft, lineHeight: 22, marginBottom: 8 },
+  sum: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 22, marginBottom: 8 },
   b: { ...font.semibold, color: colors.ink },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: '#F3ECF7',
+    backgroundColor: colors.plumTint,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -392,7 +396,7 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     gap: 14,
   },
-  loadingText: { fontSize: 14.5, color: colors.inkSoft },
+  loadingText: { fontSize: 14.5, color: colors.inkSoft, ...font.regular },
   nearbySection: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -422,7 +426,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   lookBtnText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
-  lookHint: { fontSize: 13, color: colors.inkFaint, lineHeight: 19 },
+  lookHint: { fontSize: 13, color: colors.inkFaint, ...font.regular, lineHeight: 19 },
   nearbyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,10 +435,11 @@ const styles = StyleSheet.create({
   },
   nearbyIconWrap: { width: 22, alignItems: 'center' },
   nearbyName: { fontSize: 14.5, ...font.semibold, color: colors.ink },
-  nearbyMeta: { fontSize: 12.5, color: colors.inkFaint, marginTop: 1 },
+  nearbyMeta: { fontSize: 12.5, color: colors.inkFaint, ...font.regular, marginTop: 1 },
   nearbyAttribution: {
     fontSize: 11,
     color: colors.inkFaint,
+    ...font.regular,
     marginTop: 10,
     textDecorationLine: 'underline',
   },
@@ -448,7 +453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     marginBottom: 18,
   },
-  weatherText: { flex: 1, fontSize: 14, color: colors.ink, lineHeight: 20 },
+  weatherText: { flex: 1, fontSize: 14, color: colors.ink, ...font.regular, lineHeight: 20 },
   cards: { marginTop: 6 },
   tools: { gap: 10, marginTop: 4, marginBottom: 8 },
   reshuffle: {
@@ -460,9 +465,11 @@ const styles = StyleSheet.create({
     borderColor: colors.coral,
     ...shadow.soft,
   },
-  reshufflePressed: { backgroundColor: '#FFF3EE' },
+  reshufflePressed: { backgroundColor: colors.coralTint },
+  reshuffleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reshuffleText: { fontSize: 16, ...font.bold, color: colors.coralDeep },
   ghost: { paddingVertical: 12, alignItems: 'center' },
+  ghostRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
   ghostText: { fontSize: 15, ...font.semibold, color: colors.inkSoft },
   startOver: { paddingVertical: 14, alignItems: 'center', marginTop: 2 },
   startOverText: { fontSize: 14.5, color: colors.inkFaint, ...font.medium },
@@ -474,7 +481,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     ...shadow.soft,
   },
-  emptyEmo: { fontSize: 40, marginBottom: 10 },
   emptyH: {
     fontSize: 18,
     ...font.bold,
@@ -485,6 +491,7 @@ const styles = StyleSheet.create({
   emptyP: {
     fontSize: 14.5,
     color: colors.inkSoft,
+    ...font.regular,
     lineHeight: 21,
     textAlign: 'center',
     marginBottom: 16,

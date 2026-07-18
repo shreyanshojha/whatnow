@@ -33,6 +33,10 @@ export const colors = {
   // subtle warm gradient stops used behind headers / splash
   glowPeach: '#FFF2E0',
   glowPink: '#FBE4EC',
+  // Faint tints of the accent colors above, for small badges/pressed states
+  // that need a hint of color without competing with a card surface.
+  plumTint: '#F3ECF7',
+  coralTint: '#FFF3EE',
 };
 
 export const radius = {
