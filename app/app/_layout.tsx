@@ -18,6 +18,7 @@ import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../context/AuthContext';
 import { PlanProvider } from '../context/PlanContext';
+import { hasCompletedOnboarding } from '../lib/onboarding';
 
 // Keep the splash screen up until the custom typeface is ready — Fraunces
 // and Inter are core to WhatNow's identity now, not a nice-to-have, so we
@@ -36,16 +37,26 @@ export default function RootLayout() {
     Fraunces_900Black,
   });
 
+  // Whether the first-launch carousel (app/onboarding.tsx) still needs to
+  // show. Checked once per app start — genuinely unknown until we've read
+  // the flag, so `null` (not yet known) is a distinct state from `false`.
+  const [needsOnboarding, setNeedsOnboarding] = React.useState<boolean | null>(null);
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    hasCompletedOnboarding().then((done) => setNeedsOnboarding(!done));
+  }, []);
+
+  const ready = (fontsLoaded || fontError) && needsOnboarding !== null;
+
+  useEffect(() => {
+    if (ready) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, fontError]);
+  }, [ready]);
 
   // Fall back gracefully to system fonts rather than a blank screen if the
   // custom font files ever fail to load — same "never show a broken app"
   // philosophy used everywhere else in WhatNow.
-  if (!fontsLoaded && !fontError) {
+  if (!ready) {
     return null;
   }
 
@@ -55,7 +66,17 @@ export default function RootLayout() {
         <PlanProvider>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
+            {needsOnboarding ? (
+              <>
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="(tabs)" />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="onboarding" />
+              </>
+            )}
           </Stack>
         </PlanProvider>
       </AuthProvider>
