@@ -17,7 +17,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { SUPABASE_URL, supabase } from '../lib/supabase';
 
 /** Bump this whenever PRIVACY.md changes meaningfully — recorded against the
  * account the moment consent is captured, so we always know which version of
@@ -26,6 +26,7 @@ import { supabase } from '../lib/supabase';
 export const PRIVACY_POLICY_VERSION = '2026-07-17-v1';
 
 const PENDING_CONSENT_KEY = 'whatnow.pendingPrivacyConsent.v1';
+const PENDING_REFERRAL_KEY = 'whatnow.pendingReferralCode.v1';
 
 interface AuthResult {
   error: string | null;
@@ -42,7 +43,16 @@ interface AuthContextValue {
    * against the account (immediately if email confirmation is off, or the
    * moment a session exists if confirmation is required — see the pending
    * flow below). */
-  signUpWithEmail: (email: string, password: string, acceptedPrivacyVersion: string) => Promise<AuthResult>;
+  /** `inviteCode` is optional — if provided and email confirmation is off,
+   * it's redeemed immediately after account creation; if a session isn't
+   * available yet (confirmation required), it's stashed the same way
+   * pending consent is, and redeemed the moment a session shows up. */
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    acceptedPrivacyVersion: string,
+    inviteCode?: string
+  ) => Promise<AuthResult>;
   signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   /** Calls the delete-account Edge Function (see supabase/functions),
@@ -83,6 +93,27 @@ async function writeConsent(version: string): Promise<void> {
   }
 }
 
+/** Calls the redeem-referral Edge Function with the caller's own JWT — a
+ * service-role write is required since it also bumps *someone else's*
+ * referral_count, which normal RLS on profiles rightly forbids from any
+ * other account. Fails silently by design (like writeConsent above): an
+ * invite code that doesn't redeem shouldn't ever block or break sign-up. */
+async function redeemPendingCode(code: string): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch(`${SUPABASE_URL}/functions/v1/redeem-referral`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+  } catch {
+    // ignore — worth retrying isn't worth the complexity here; a missed
+    // redemption just means one fewer referral counted, never a broken app
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [initializing, setInitializing] = useState(true);
@@ -102,13 +133,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         pendingCheckedRef.current = true;
         (async () => {
           try {
-            const pending = await AsyncStorage.getItem(PENDING_CONSENT_KEY);
-            if (pending) {
-              await writeConsent(pending);
+            const pendingConsent = await AsyncStorage.getItem(PENDING_CONSENT_KEY);
+            if (pendingConsent) {
+              await writeConsent(pendingConsent);
               await AsyncStorage.removeItem(PENDING_CONSENT_KEY);
             }
+            const pendingCode = await AsyncStorage.getItem(PENDING_REFERRAL_KEY);
+            if (pendingCode) {
+              await redeemPendingCode(pendingCode);
+              await AsyncStorage.removeItem(PENDING_REFERRAL_KEY);
+            }
           } catch {
-            // ignore — worst case consent gets recorded a little later
+            // ignore — worst case consent/referral get recorded a little later
           }
         })();
       }
@@ -119,19 +155,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUpWithEmail = async (
     email: string,
     password: string,
-    acceptedPrivacyVersion: string
+    acceptedPrivacyVersion: string,
+    inviteCode?: string
   ): Promise<AuthResult> => {
     const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) return { error: friendlyAuthError(error.message) };
+    const trimmedCode = inviteCode?.trim();
     if (data.session) {
-      // Confirmed immediately (email confirmations off) — record consent now.
+      // Confirmed immediately (email confirmations off) — record consent
+      // and redeem any invite code right away.
       await writeConsent(acceptedPrivacyVersion);
+      if (trimmedCode) await redeemPendingCode(trimmedCode);
     } else {
-      // Awaiting email confirmation — no session yet to attach consent to.
-      // Stash it and apply it the moment a session shows up (see the
-      // onAuthStateChange handler above), so consent is never lost.
+      // Awaiting email confirmation — no session yet to attach either to.
+      // Stash both and apply them the moment a session shows up (see the
+      // onAuthStateChange handler above), so neither is ever lost.
       try {
         await AsyncStorage.setItem(PENDING_CONSENT_KEY, acceptedPrivacyVersion);
+        if (trimmedCode) await AsyncStorage.setItem(PENDING_REFERRAL_KEY, trimmedCode);
       } catch {
         // ignore
       }
@@ -153,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) return { error: 'Not signed in.' };
-      const res = await fetch(`${(supabase as any).supabaseUrl}/functions/v1/delete-account`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });

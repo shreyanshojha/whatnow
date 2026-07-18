@@ -89,6 +89,13 @@ that same AI provider, which searches the live web and returns real local events
 movies playing near you. Nothing is stored by WhatNow; results only exist on your screen for
 that session.
 
+## Invite codes
+
+If you're signed in, your account has a short invite code you can share with friends. If a
+friend enters it when creating their own account, WhatNow records that one link (which
+account invited which) so we can show you how many friends have joined — nothing more than
+that pairing and a count is stored, and it's deleted along with your account.
+
 ## Optional live events
 
 If you turn on live nearby events and provide your own Ticketmaster API key, your

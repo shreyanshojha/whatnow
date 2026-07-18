@@ -94,6 +94,25 @@ export async function syncFeedbackEvent(
   }
 }
 
+/** Reads this account's own invite code + how many friends have joined
+ * using it — see the "Invite friends" card in the About screen. Returns
+ * null if signed out or on any read failure (never blocks the screen). */
+export async function fetchReferralInfo(): Promise<{ code: string; count: number } | null> {
+  const userId = await currentUserId();
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('referral_code, referral_count')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data || !data.referral_code) return null;
+    return { code: data.referral_code as string, count: (data.referral_count as number) ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
 export async function syncPlanEvent(input: PlanInput, planSource: 'engine' | 'ai'): Promise<void> {
   const userId = await currentUserId();
   if (!userId) return;

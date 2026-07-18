@@ -23,7 +23,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 
-const SUPABASE_URL = 'https://foxaoemjsrwozjnucgfj.supabase.co';
+// Exported (not just used internally) so any code that needs to call a
+// Supabase Edge Function directly via fetch — see AuthContext's
+// deleteAccount/redeemReferralCode — has a stable, public way to get the
+// project URL instead of reaching into the client's private internals.
+export const SUPABASE_URL = 'https://foxaoemjsrwozjnucgfj.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_knkBrkubczJJ-xo7QBUvSQ_MUnOkTtp';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

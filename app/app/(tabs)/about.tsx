@@ -5,6 +5,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -16,6 +17,7 @@ import { Icon } from '../../components/Icon';
 import { PRIVACY_POLICY_VERSION, useAuth } from '../../context/AuthContext';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
+import { fetchReferralInfo } from '../../lib/sync';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
 import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../../lib/usageLimits';
 
@@ -274,6 +276,7 @@ function AccountCard() {
   const [mode, setMode] = React.useState<'signIn' | 'signUp'>('signUp');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [inviteCode, setInviteCode] = React.useState('');
   const [consented, setConsented] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -295,7 +298,7 @@ function AccountCard() {
     try {
       const result =
         mode === 'signUp'
-          ? await signUpWithEmail(email, password, PRIVACY_POLICY_VERSION)
+          ? await signUpWithEmail(email, password, PRIVACY_POLICY_VERSION, inviteCode)
           : await signInWithEmail(email, password);
       if (result.error) {
         setError(result.error);
@@ -342,6 +345,9 @@ function AccountCard() {
           Signed in as <Text style={font.semibold}>{user.email}</Text>. Your saved activities
           and learning history follow you to any device you sign into.
         </Text>
+
+        <InviteFriends />
+
         <Pressable
           onPress={() => signOut()}
           accessibilityRole="button"
@@ -442,6 +448,21 @@ function AccountCard() {
       </View>
 
       {mode === 'signUp' ? (
+        <View style={styles.acctFieldRow}>
+          <Icon name="user" size={16} color={colors.inkFaint} strokeWidth={1.7} />
+          <TextInput
+            value={inviteCode}
+            onChangeText={setInviteCode}
+            placeholder="Invite code (optional)"
+            placeholderTextColor={colors.inkFaint}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            style={styles.acctInput}
+          />
+        </View>
+      ) : null}
+
+      {mode === 'signUp' ? (
         <Pressable
           onPress={() => setConsented(!consented)}
           accessibilityRole="checkbox"
@@ -483,6 +504,56 @@ function AccountCard() {
         You can skip this — WhatNow still works fully on this device. Signing in is what lets
         it remember you elsewhere.
       </Text>
+    </View>
+  );
+}
+
+function InviteFriends() {
+  const [info, setInfo] = React.useState<{ code: string; count: number } | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchReferralInfo().then((result) => {
+      if (!cancelled) {
+        setInfo(result);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onShare = () => {
+    if (!info) return;
+    Share.share({
+      message: `I've been using WhatNow to figure out what to do when I can't decide — tell it your mood, it builds a plan. Sign up and enter my invite code ${info.code} to link up: https://whatnow.app`,
+    }).catch(() => {});
+  };
+
+  if (loading || !info) return null;
+
+  return (
+    <View style={styles.inviteBox}>
+      <View style={styles.inviteHeaderRow}>
+        <Text style={styles.inviteLabel}>Your invite code</Text>
+        {info.count > 0 ? (
+          <Text style={styles.inviteCount}>
+            {info.count} friend{info.count === 1 ? '' : 's'} joined
+          </Text>
+        ) : null}
+      </View>
+      <Text style={styles.inviteCode}>{info.code}</Text>
+      <Pressable
+        onPress={onShare}
+        accessibilityRole="button"
+        accessibilityLabel="Share invite code"
+        style={({ pressed }) => [styles.inviteShareBtn, pressed && { opacity: 0.8 }]}
+      >
+        <Icon name="arrow-right" size={15} color={colors.white} strokeWidth={2} />
+        <Text style={styles.inviteShareText}>Invite a friend</Text>
+      </Pressable>
     </View>
   );
 }
@@ -575,6 +646,28 @@ const styles = StyleSheet.create({
     color: colors.inkFaint,
   },
   acctHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  inviteBox: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 14,
+    marginTop: 14,
+  },
+  inviteHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  inviteLabel: { fontSize: 12.5, ...font.semibold, color: colors.inkFaint, textTransform: 'uppercase', letterSpacing: 0.3 },
+  inviteCount: { fontSize: 12.5, ...font.semibold, color: colors.sage },
+  inviteCode: { fontSize: 22, ...fontDisplay.bold, color: colors.coralDeep, letterSpacing: 2, marginTop: 6, marginBottom: 12 },
+  inviteShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.coralDeep,
+    borderRadius: radius.md,
+    paddingVertical: 11,
+  },
+  inviteShareText: { fontSize: 14, ...font.bold, color: colors.white },
   acctModeRow: {
     flexDirection: 'row',
     backgroundColor: colors.bg,
