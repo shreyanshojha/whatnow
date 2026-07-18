@@ -18,7 +18,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.coralDeep,
         tabBarInactiveTintColor: colors.inkFaint,
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.line },
-        tabBarLabelStyle: { fontSize: 11.5, fontWeight: font.semibold },
+        tabBarLabelStyle: { fontSize: 11.5, ...font.semibold },
       }}
     >
       <Tabs.Screen

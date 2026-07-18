@@ -11,7 +11,7 @@ import {
 } from '../data/activities';
 import { whyFor } from '../lib/plan';
 import { NearbyPlace } from '../lib/places';
-import { colors, font, radius, shadow } from '../lib/theme';
+import { colors, font, fontDisplay, radius, shadow } from '../lib/theme';
 
 interface Props {
   activity: Activity;
@@ -190,12 +190,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   catEmo: { fontSize: 13 },
-  catLabel: { fontSize: 12, fontWeight: font.bold, letterSpacing: 0.3 },
+  catLabel: { fontSize: 12, ...font.bold, letterSpacing: 0.3 },
   saveBtn: { padding: 2 },
   heart: { fontSize: 26, color: colors.inkFaint, lineHeight: 28 },
   title: {
     fontSize: 20,
-    fontWeight: font.bold,
+    ...fontDisplay.bold,
     color: colors.ink,
     lineHeight: 26,
     marginBottom: 5,
@@ -204,14 +204,14 @@ const styles = StyleSheet.create({
   why: { borderRadius: radius.md, padding: 13, marginBottom: 12 },
   whyLabel: {
     fontSize: 11,
-    fontWeight: font.bold,
+    ...font.bold,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   whyText: { fontSize: 14.5, color: colors.ink, lineHeight: 20 },
   tip: { fontSize: 13.5, color: colors.inkSoft, marginBottom: 12 },
-  tipStrong: { fontWeight: font.semibold, color: colors.ink },
+  tipStrong: { ...font.semibold, color: colors.ink },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     backgroundColor: colors.bg,
@@ -221,5 +221,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  chipText: { fontSize: 12.5, color: colors.inkSoft, fontWeight: font.medium },
+  chipText: { fontSize: 12.5, color: colors.inkSoft, ...font.medium },
 });

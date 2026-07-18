@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MOODS, MoodId } from '../../../data/activities';
 import { usePlan } from '../../../context/PlanContext';
-import { colors, font, radius, shadow } from '../../../lib/theme';
+import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 
 export default function MoodScreen() {
   const router = useRouter();
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
   brand: {
     fontSize: 24,
-    fontWeight: font.bold,
+    ...fontDisplay.bold,
     color: colors.ink,
     letterSpacing: -0.5,
     marginBottom: 22,
@@ -111,12 +111,12 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 14,
     color: colors.amber,
-    fontWeight: font.semibold,
+    ...font.semibold,
     marginBottom: 8,
   },
   h1: {
     fontSize: 29,
-    fontWeight: font.bold,
+    ...fontDisplay.bold,
     color: colors.ink,
     lineHeight: 35,
     letterSpacing: -0.5,
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   moodEmo: { fontSize: 34 },
   moodWord: {
     fontSize: 14,
-    fontWeight: font.semibold,
+    ...font.semibold,
     color: colors.inkSoft,
     textTransform: 'capitalize',
   },
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   footerHint: {
     fontSize: 14,
     color: colors.ink,
-    fontWeight: font.medium,
+    ...font.medium,
     marginBottom: 10,
     textAlign: 'center',
   },
@@ -182,5 +182,5 @@ const styles = StyleSheet.create({
   },
   ctaDisabled: { backgroundColor: '#EAD9CD' },
   ctaPressed: { backgroundColor: colors.coralDeep },
-  ctaText: { color: colors.white, fontSize: 17, fontWeight: font.bold },
+  ctaText: { color: colors.white, fontSize: 17, ...font.bold },
 });

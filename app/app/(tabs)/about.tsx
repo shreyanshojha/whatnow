@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
-import { colors, font, radius } from '../../lib/theme';
+import { colors, font, fontDisplay, radius } from '../../lib/theme';
 import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../../lib/usageLimits';
 
 export default function AboutScreen() {
@@ -277,8 +277,8 @@ function Step({ n, t, d }: { n: string; t: string; d: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 10 },
-  brand: { fontSize: 30, fontWeight: font.bold, color: colors.ink, letterSpacing: -0.6 },
-  tagline: { fontSize: 15, color: colors.amber, fontWeight: font.semibold, marginTop: 4, marginBottom: 16 },
+  brand: { fontSize: 30, ...fontDisplay.bold, color: colors.ink, letterSpacing: -0.6 },
+  tagline: { fontSize: 15, color: colors.amber, ...font.semibold, marginTop: 4, marginBottom: 16 },
   p: { fontSize: 15.5, color: colors.inkSoft, lineHeight: 23, marginBottom: 20 },
   card: {
     backgroundColor: colors.card,
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  cardH: { fontSize: 17, fontWeight: font.bold, color: colors.ink, marginBottom: 12 },
+  cardH: { fontSize: 17, ...font.bold, color: colors.ink, marginBottom: 12 },
   cardP: { fontSize: 14.5, color: colors.inkSoft, lineHeight: 21 },
   aiHeaderRow: {
     flexDirection: 'row',
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   keySavedText: {
     fontSize: 14,
-    fontWeight: font.semibold,
+    ...font.semibold,
     color: colors.coralDeep,
   },
   keyFooterRow: {
@@ -338,10 +338,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepNumText: { fontSize: 14, fontWeight: font.bold, color: colors.coralDeep },
-  stepT: { fontSize: 15, fontWeight: font.semibold, color: colors.ink },
+  stepNumText: { fontSize: 14, ...font.bold, color: colors.coralDeep },
+  stepT: { fontSize: 15, ...font.semibold, color: colors.ink },
   stepD: { fontSize: 13.5, color: colors.inkSoft, lineHeight: 19, marginTop: 1 },
   credit: { fontSize: 13.5, color: colors.inkFaint, lineHeight: 20, marginTop: 4 },
-  link: { color: colors.coralDeep, fontWeight: font.semibold },
+  link: { color: colors.coralDeep, ...font.semibold },
   version: { fontSize: 12.5, color: colors.inkFaint, marginTop: 12 },
 });

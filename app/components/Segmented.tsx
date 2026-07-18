@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   group: { marginBottom: 18 },
   label: {
     fontSize: 13,
-    fontWeight: font.semibold,
+    ...font.semibold,
     color: colors.inkFaint,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
@@ -93,8 +93,8 @@ const styles = StyleSheet.create({
   ic: { fontSize: 15 },
   segText: {
     fontSize: 14,
-    fontWeight: font.medium,
+    ...font.medium,
     color: colors.inkSoft,
   },
-  segTextActive: { color: colors.ink, fontWeight: font.semibold },
+  segTextActive: { color: colors.ink, ...font.semibold },
 });

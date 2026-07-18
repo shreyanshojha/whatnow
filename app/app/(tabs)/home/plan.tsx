@@ -21,7 +21,7 @@ import {
   SOCIAL_LABEL,
   TIME_LABEL,
 } from '../../../data/activities';
-import { colors, font, radius, shadow } from '../../../lib/theme';
+import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 import { useReducedMotion } from '../../../lib/useReducedMotion';
 import { weatherNote } from '../../../lib/weather';
 
@@ -252,14 +252,14 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 6 },
   h1: {
     fontSize: 26,
-    fontWeight: font.bold,
+    ...fontDisplay.bold,
     color: colors.ink,
     letterSpacing: -0.4,
     lineHeight: 32,
     marginBottom: 8,
   },
   sum: { fontSize: 15, color: colors.inkSoft, lineHeight: 22, marginBottom: 8 },
-  b: { fontWeight: font.semibold, color: colors.ink },
+  b: { ...font.semibold, color: colors.ink },
   aiBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#F3ECF7',
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 12,
   },
-  aiBadgeText: { fontSize: 12.5, fontWeight: font.semibold, color: colors.plum },
+  aiBadgeText: { fontSize: 12.5, ...font.semibold, color: colors.plum },
   loading: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  nearbyH: { fontSize: 15, fontWeight: font.bold, color: colors.ink, marginBottom: 10 },
+  nearbyH: { fontSize: 15, ...font.bold, color: colors.ink, marginBottom: 10 },
   nearbyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   nearbyIcon: { fontSize: 18, width: 22, textAlign: 'center' },
-  nearbyName: { fontSize: 14.5, fontWeight: font.semibold, color: colors.ink },
+  nearbyName: { fontSize: 14.5, ...font.semibold, color: colors.ink },
   nearbyMeta: { fontSize: 12.5, color: colors.inkFaint, marginTop: 1 },
   nearbyAttribution: {
     fontSize: 11,
@@ -324,11 +324,11 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   reshufflePressed: { backgroundColor: '#FFF3EE' },
-  reshuffleText: { fontSize: 16, fontWeight: font.bold, color: colors.coralDeep },
+  reshuffleText: { fontSize: 16, ...font.bold, color: colors.coralDeep },
   ghost: { paddingVertical: 12, alignItems: 'center' },
-  ghostText: { fontSize: 15, fontWeight: font.semibold, color: colors.inkSoft },
+  ghostText: { fontSize: 15, ...font.semibold, color: colors.inkSoft },
   startOver: { paddingVertical: 14, alignItems: 'center', marginTop: 2 },
-  startOverText: { fontSize: 14.5, color: colors.inkFaint, fontWeight: font.medium },
+  startOverText: { fontSize: 14.5, color: colors.inkFaint, ...font.medium },
   empty: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   emptyEmo: { fontSize: 40, marginBottom: 10 },
   emptyH: {
     fontSize: 18,
-    fontWeight: font.bold,
+    ...font.bold,
     color: colors.ink,
     marginBottom: 6,
     textAlign: 'center',

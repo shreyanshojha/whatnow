@@ -1,10 +1,22 @@
-/* WhatNow — warm, friendly design tokens (ported palette from web v1). */
+/* ============================================================
+   WhatNow — design tokens.
+
+   Bespoke identity, not a template: warm cream/white surfaces with
+   one decisive coral accent (never diluted by competing mood colors
+   on the same surface), a serif display face for anything that
+   should feel like a considered word choice from a friend (headlines,
+   activity titles), and a clean grotesque for everything functional.
+   Mood color now reads as a small accent (chip/stroke), not a full
+   pastel wash — see MOODS in data/activities.ts.
+   ============================================================ */
 
 export const colors = {
   bg: '#FDF6EE',
   bg2: '#FBEEE0',
   card: '#FFFFFF',
-  ink: '#2C2320',
+  // Warm near-black, not soft brown-grey — sharper typographic contrast
+  // than the earlier #2C2320 (16.8:1 on white vs. 15.4:1 before).
+  ink: '#221C18',
   inkSoft: '#6B5D54',
   // Darkened from #9A8B80 (was ~3.1:1 on bg, below WCAG AA) to clear 4.5:1
   // with real margin — this color is used for meta text throughout the app.
@@ -55,11 +67,29 @@ export const shadow = {
   },
 };
 
+/**
+ * Functional text — UI chrome, body copy, labels, buttons. Inter reads
+ * clean and neutral so it never competes with the display face below.
+ * Spread these into a style object (`...font.semibold`), don't assign
+ * to `fontWeight` — the weight is baked into each font file.
+ */
 export const font = {
-  // System font stack keeps the bundle lean and store-ready without
-  // shipping custom fonts; weights below read as friendly + warm.
-  regular: '400' as const,
-  medium: '500' as const,
-  semibold: '600' as const,
-  bold: '700' as const,
+  regular: { fontFamily: 'Inter_400Regular' as const },
+  medium: { fontFamily: 'Inter_500Medium' as const },
+  semibold: { fontFamily: 'Inter_600SemiBold' as const },
+  bold: { fontFamily: 'Inter_700Bold' as const },
+};
+
+/**
+ * Display text — the handful of moments that should feel like a
+ * considered word choice from a friend, not app chrome: the brand
+ * wordmark, screen headlines, and every activity title. Fraunces'
+ * warm, slightly eccentric serif is what makes WhatNow's type
+ * unmistakably its own rather than a system-font starter app.
+ */
+export const fontDisplay = {
+  regular: { fontFamily: 'Fraunces_400Regular' as const },
+  semibold: { fontFamily: 'Fraunces_600SemiBold' as const },
+  bold: { fontFamily: 'Fraunces_700Bold' as const },
+  black: { fontFamily: 'Fraunces_900Black' as const },
 };

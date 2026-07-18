@@ -49,7 +49,8 @@
           "locationWhenInUsePermission": "WhatNow uses your location only to tailor suggestions to your weather and nearby places."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

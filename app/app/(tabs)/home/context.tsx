@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Segmented } from '../../../components/Segmented';
 import { usePlan } from '../../../context/PlanContext';
 import { MOODS } from '../../../data/activities';
-import { colors, font, radius, shadow } from '../../../lib/theme';
+import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 import { weatherNote } from '../../../lib/weather';
 
 export default function ContextScreen() {
@@ -189,12 +189,12 @@ const styles = StyleSheet.create({
   moodPillEmo: { fontSize: 15 },
   moodPillText: {
     fontSize: 13.5,
-    fontWeight: font.semibold,
+    ...font.semibold,
     textTransform: 'capitalize',
   },
   h1: {
     fontSize: 26,
-    fontWeight: font.bold,
+    ...fontDisplay.bold,
     color: colors.ink,
     letterSpacing: -0.4,
     marginBottom: 6,
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   weatherBody: { fontSize: 14.5, color: colors.inkSoft, lineHeight: 21 },
-  weatherPlace: { fontSize: 13.5, color: colors.ink, fontWeight: font.medium, marginTop: 8 },
+  weatherPlace: { fontSize: 13.5, color: colors.ink, ...font.medium, marginTop: 8 },
   weatherBtn: {
     marginTop: 12,
     alignSelf: 'flex-start',
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     minWidth: 140,
     alignItems: 'center',
   },
-  weatherBtnText: { fontSize: 14.5, fontWeight: font.semibold, color: colors.coralDeep },
+  weatherBtnText: { fontSize: 14.5, ...font.semibold, color: colors.coralDeep },
   footer: {
     position: 'absolute',
     left: 0,
@@ -241,5 +241,5 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   ctaPressed: { backgroundColor: colors.coralDeep },
-  ctaText: { color: colors.white, fontSize: 17, fontWeight: font.bold },
+  ctaText: { color: colors.white, fontSize: 17, ...font.bold },
 });
