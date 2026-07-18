@@ -119,6 +119,8 @@ interface PlanContextValue {
   clearLocationHistory: () => void;
   // On-device-only accept/reject learning log (see lib/feedback.ts)
   clearFeedback: () => void;
+  // Clears mood/constraints/lastPlan for a genuine "start over" — see plan.tsx
+  resetFlow: () => void;
   // Reasonable daily caps on the BYOK calls (see lib/usageLimits.ts)
   aiPlansRemainingToday: number;
   eventsLookupsRemainingToday: number;
@@ -434,6 +436,22 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     persistSaved([]);
   }, [persistSaved]);
 
+  /** "Start over" should mean it: clear the mood + constraint choices and the
+   * plan they produced, not just navigate back to the mood picker while the
+   * old mood stays highlighted and could silently regenerate the same plan.
+   * Saved activities, location, and AI/events settings are untouched — those
+   * aren't part of "this one plan attempt." */
+  const resetFlow = useCallback(() => {
+    setMood(null);
+    setEnergy('medium');
+    setTime(60);
+    setSocial('solo');
+    setSetting('either');
+    setBudget('cheap');
+    setLastPlan([]);
+    setPlanSource(null);
+  }, []);
+
   const value: PlanContextValue = {
     mood,
     energy,
@@ -471,6 +489,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setEventsApiKey,
     clearLocationHistory,
     clearFeedback,
+    resetFlow,
     aiPlansRemainingToday,
     eventsLookupsRemainingToday,
   };

@@ -46,6 +46,7 @@ export default function PlanScreen() {
     isSaved,
     toggleSave,
     saved,
+    resetFlow,
   } = usePlan();
   // Bump a key on reshuffle so cards re-mount + replay their reveal.
   const [nonce, setNonce] = React.useState(0);
@@ -148,7 +149,10 @@ export default function PlanScreen() {
       <NearbyRightNow nearby={nearby} events={nearbyEvents} eventsLoading={eventsLoading} />
 
       <Pressable
-        onPress={() => router.replace('/')}
+        onPress={() => {
+          resetFlow();
+          router.replace('/');
+        }}
         style={({ pressed }) => [styles.startOver, pressed && { opacity: 0.7 }]}
       >
         <Text style={styles.startOverText}>Start over</Text>
