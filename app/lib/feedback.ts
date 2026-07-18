@@ -15,11 +15,12 @@
      bury an activity forever; a single save shouldn't crowd out
      everything else. Weights are small nudges, capped, and blend
      mood-specific signal with the activity's overall track record.
-   - No explicit "kept it and did nothing" signal. We can't reliably
-     tell "did this and loved it" apart from "forgot the phone was
-     open" — so v1 only counts the two events a person clearly
-     chose: reshuffling something away, or saving it. That's a
-     deliberately conservative choice over inventing a noisy signal.
+   - Two kinds of signal, weighted differently. Save/reshuffle-away
+     are *implicit* — a save might just mean "looked appealing," not
+     "this actually helped." The explicit thumbs-up/down control on
+     each card (below the "why this helps" line) is a person directly
+     answering "was this a good call for how I was feeling?" — a
+     stronger, more deliberate statement, so it moves the score more.
    - Cheap to read. Plan generation reads the whole log once per
      mood (getFeedbackWeights), not once per activity per candidate.
    ============================================================ */
@@ -27,7 +28,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodId } from '../data/activities';
 
-export type FeedbackEvent = 'shown' | 'accepted' | 'rejected';
+export type FeedbackEvent = 'shown' | 'accepted' | 'rejected' | 'thumbsUp' | 'thumbsDown';
 
 interface FeedbackRecord {
   id: string; // Activity.id
@@ -80,6 +81,18 @@ export async function recordAccepted(id: string, mood: MoodId): Promise<void> {
   await appendRecords([{ id, mood, event: 'accepted', at: Date.now() }]);
 }
 
+/** Call when someone taps the explicit thumbs-up/down control on a card —
+ * a direct answer to "was this a good call?", not an inferred signal. */
+export async function recordExplicitFeedback(
+  id: string,
+  mood: MoodId,
+  positive: boolean
+): Promise<void> {
+  await appendRecords([
+    { id, mood, event: positive ? 'thumbsUp' : 'thumbsDown', at: Date.now() },
+  ]);
+}
+
 export async function clearFeedback(): Promise<void> {
   try {
     await AsyncStorage.removeItem(FEEDBACK_KEY);
@@ -114,7 +127,18 @@ export async function getFeedbackWeights(mood: MoodId): Promise<Map<string, numb
     let netMood = 0;
     let netAny = 0;
     for (const r of records) {
-      const delta = r.event === 'accepted' ? 1 : r.event === 'rejected' ? -1 : 0;
+      // Explicit thumbs-up/down counts double an implicit save/reshuffle —
+      // it's a direct answer, not an inferred one.
+      const delta =
+        r.event === 'accepted'
+          ? 1
+          : r.event === 'rejected'
+          ? -1
+          : r.event === 'thumbsUp'
+          ? 2
+          : r.event === 'thumbsDown'
+          ? -2
+          : 0;
       if (delta === 0) continue; // "shown" alone carries no signal
       netAny += delta;
       if (r.mood === mood) netMood += delta;

@@ -9,6 +9,7 @@ import {
   clearFeedback,
   getFeedbackWeights,
   recordAccepted,
+  recordExplicitFeedback,
   recordRejected,
   recordShown,
 } from '../feedback';
@@ -81,5 +82,29 @@ describe('getFeedbackWeights', () => {
     const w = await getFeedbackWeights('restless');
     expect(w.get('hike')).toBeGreaterThan(0);
     expect(w.get('read')).toBeLessThan(0);
+  });
+
+  it('weighs an explicit thumbs-up more than an implicit accept', async () => {
+    await recordAccepted('hike', 'restless');
+    const implicitOnly = await getFeedbackWeights('restless');
+    await clearFeedback();
+    await recordExplicitFeedback('hike', 'restless', true);
+    const explicitOnly = await getFeedbackWeights('restless');
+    expect(explicitOnly.get('hike')!).toBeGreaterThan(implicitOnly.get('hike')!);
+  });
+
+  it('gives a thumbs-down a negative weight and caps it like other signals', async () => {
+    for (let i = 0; i < 10; i++) {
+      await recordExplicitFeedback('hike', 'restless', false);
+    }
+    const w = await getFeedbackWeights('restless');
+    expect(w.get('hike')).toBe(-6);
+  });
+
+  it('lets a thumbs-up and thumbs-down on the same activity roughly cancel out', async () => {
+    await recordExplicitFeedback('hike', 'restless', true);
+    await recordExplicitFeedback('hike', 'restless', false);
+    const w = await getFeedbackWeights('restless');
+    expect(w.get('hike')).toBeUndefined(); // net zero -> no weight stored
   });
 });

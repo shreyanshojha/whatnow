@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Activity,
@@ -9,6 +9,7 @@ import {
   PLACE_LABEL,
   TIME_LABEL,
 } from '../data/activities';
+import { recordExplicitFeedback } from '../lib/feedback';
 import { whyFor } from '../lib/plan';
 import { NearbyPlace } from '../lib/places';
 import { colors, font, fontDisplay, radius, shadow } from '../lib/theme';
@@ -58,6 +59,7 @@ export function ActivityCard({
   const cat = CATS[a.cat];
   const anim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  const [given, setGiven] = useState<'up' | 'down' | null>(null);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -91,6 +93,19 @@ export function ActivityCard({
       ]).start();
     }
     onToggleSave(a);
+  };
+
+  // The explicit "was this a good call?" signal — a direct answer, weighted
+  // more heavily than the implicit save/reshuffle signal (see lib/feedback.ts).
+  // Tapping the already-chosen side is a no-op so a stray double-tap can't
+  // silently double-record; tapping the other side lets someone change their
+  // mind, which just adds a fresh, opposite-signed record to the log.
+  const handleExplicitFeedback = (positive: boolean) => {
+    const next = positive ? 'up' : 'down';
+    if (given === next) return;
+    setGiven(next);
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    recordExplicitFeedback(a.id, mood, positive).catch(() => {});
   };
 
   // Surface a real nearby amenity as a gentle tip when it fits the category.
@@ -166,6 +181,44 @@ export function ActivityCard({
         <Chip icon={PLACE_ICON[a.place]}>{PLACE_LABEL[a.place]}</Chip>
         <Chip icon={COST_ICON[a.cost]}>{COST_LABEL[a.cost]}</Chip>
       </View>
+
+      <View style={styles.feedbackRow}>
+        <Text style={styles.feedbackLabel}>
+          {given ? 'Thanks — that helps WhatNow learn.' : 'Good call for this moment?'}
+        </Text>
+        <View style={styles.feedbackBtns}>
+          <Pressable
+            onPress={() => handleExplicitFeedback(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: given === 'up' }}
+            accessibilityLabel="Yes, good call"
+            style={[styles.feedbackBtn, given === 'up' && styles.feedbackBtnUpActive]}
+          >
+            <Icon
+              name="thumb-up"
+              size={15}
+              color={given === 'up' ? colors.white : colors.inkFaint}
+              strokeWidth={1.9}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => handleExplicitFeedback(false)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: given === 'down' }}
+            accessibilityLabel="No, not a good call"
+            style={[styles.feedbackBtn, given === 'down' && styles.feedbackBtnDownActive]}
+          >
+            <Icon
+              name="thumb-down"
+              size={15}
+              color={given === 'down' ? colors.white : colors.inkFaint}
+              strokeWidth={1.9}
+            />
+          </Pressable>
+        </View>
+      </View>
     </Animated.View>
   );
 }
@@ -239,4 +292,28 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   chipText: { fontSize: 12.5, color: colors.inkSoft, ...font.medium },
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  feedbackLabel: { flex: 1, fontSize: 12.5, color: colors.inkFaint },
+  feedbackBtns: { flexDirection: 'row', gap: 8 },
+  feedbackBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  feedbackBtnUpActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  feedbackBtnDownActive: { backgroundColor: colors.inkFaint, borderColor: colors.inkFaint },
 });
