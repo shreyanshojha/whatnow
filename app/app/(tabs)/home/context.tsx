@@ -31,6 +31,8 @@ export default function ContextScreen() {
     setSetting,
     budget,
     setBudget,
+    withKids,
+    setWithKids,
     weather,
     nearby,
     locationStatus,
@@ -138,6 +140,26 @@ export default function ContextScreen() {
           ]}
         />
 
+        <Pressable
+          onPress={() => setWithKids(!withKids)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: withKids }}
+          accessibilityLabel="Kids will be with me"
+          style={({ pressed }) => [
+            styles.kidsToggle,
+            withKids && styles.kidsToggleActive,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Icon name="kids" size={19} color={withKids ? colors.white : colors.inkSoft} strokeWidth={1.8} />
+          <Text style={[styles.kidsToggleText, withKids && styles.kidsToggleTextActive]}>
+            Kids will be with me
+          </Text>
+          <View style={[styles.kidsCheck, withKids && styles.kidsCheckActive]}>
+            {withKids ? <Icon name="check" size={12} color={colors.coral} strokeWidth={2.4} /> : null}
+          </View>
+        </Pressable>
+
         <View style={styles.weatherCard}>
           <View style={styles.weatherRow}>
             {weather ? (
@@ -209,6 +231,31 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sub: { fontSize: 15, color: colors.inkSoft, lineHeight: 21, marginBottom: 22 },
+  kidsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    marginBottom: 18,
+  },
+  kidsToggleActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  kidsToggleText: { flex: 1, fontSize: 14.5, color: colors.ink, ...font.medium },
+  kidsToggleTextActive: { color: colors.white, ...font.semibold },
+  kidsCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kidsCheckActive: { backgroundColor: colors.white, borderColor: colors.white },
   weatherCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,

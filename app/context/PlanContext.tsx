@@ -82,12 +82,14 @@ interface PlanContextValue {
   social: Social;
   setting: Place;
   budget: Budget;
+  withKids: boolean;
   setMood: (m: MoodId) => void;
   setEnergy: (e: Energy) => void;
   setTime: (t: TimeVal) => void;
   setSocial: (s: Social) => void;
   setSetting: (p: Place) => void;
   setBudget: (b: Budget) => void;
+  setWithKids: (v: boolean) => void;
   // derived
   weather: WeatherState | null;
   nearby: NearbyPlace | null;
@@ -135,6 +137,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [social, setSocial] = useState<Social>('solo');
   const [setting, setSetting] = useState<Place>('either');
   const [budget, setBudget] = useState<Budget>('cheap');
+  const [withKids, setWithKids] = useState<boolean>(false);
 
   const [weather, setWeather] = useState<WeatherState | null>(null);
   const [nearby, setNearby] = useState<NearbyPlace | null>(null);
@@ -246,8 +249,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   const planInput: PlanInput | null = useMemo(() => {
     if (!mood) return null;
-    return { mood, energy, time, social, setting, budget, weather };
-  }, [mood, energy, time, social, setting, budget, weather]);
+    return { mood, energy, time, social, setting, budget, weather, withKids };
+  }, [mood, energy, time, social, setting, budget, weather, withKids]);
 
   /** Bounded wait: if a location request just kicked off, give it a moment
    * to land so the plan can use it — but never block plan generation for
@@ -266,7 +269,16 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       if (!mood) return [];
       await awaitPendingLocation();
 
-      const input: PlanInput = { mood, energy, time, social, setting, budget, weather: weatherRef.current };
+      const input: PlanInput = {
+        mood,
+        energy,
+        time,
+        social,
+        setting,
+        budget,
+        weather: weatherRef.current,
+        withKids,
+      };
       setPlanLoading(true);
       try {
         let cards: PlanCard[] | null = null;
@@ -313,7 +325,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         setPlanLoading(false);
       }
     },
-    [mood, energy, time, social, setting, budget, aiEnabled, aiApiKey, refreshUsageCounts, lastPlan]
+    [mood, energy, time, social, setting, budget, withKids, aiEnabled, aiApiKey, refreshUsageCounts, lastPlan]
   );
 
   const reshuffle = useCallback(async (): Promise<PlanCard[]> => {
@@ -448,6 +460,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setSocial('solo');
     setSetting('either');
     setBudget('cheap');
+    setWithKids(false);
     setLastPlan([]);
     setPlanSource(null);
   }, []);
@@ -459,12 +472,14 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     social,
     setting,
     budget,
+    withKids,
     setMood,
     setEnergy,
     setTime,
     setSocial,
     setSetting,
     setBudget,
+    setWithKids,
     weather,
     nearby,
     locationStatus,

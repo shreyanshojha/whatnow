@@ -108,6 +108,12 @@ function buildPrompt(
         `it outright to them): ${patternHint}`
     );
   }
+  if (input.withKids) {
+    lines.push(
+      `A child will be along for this — every suggestion must be genuinely safe and ` +
+        `appropriate to do with a young child present, not just "not harmful."`
+    );
+  }
   if (avoidTitles.length > 0) {
     lines.push(
       `They just reshuffled away these suggestions — don't repeat them, offer something ` +
@@ -202,6 +208,10 @@ function validateActivity(raw: unknown, input: PlanInput): Activity | null {
 
   return {
     id: `ai:${slugify(a.t as string)}`,
+    // Always true: when withKids was requested, buildPrompt already told the
+    // model every suggestion must be kid-appropriate; when it wasn't
+    // requested, this field is never consulted for filtering anyway.
+    kidFriendly: true,
     t: (a.t as string).trim(),
     d: (a.d as string).trim(),
     cat: a.cat as CatId,

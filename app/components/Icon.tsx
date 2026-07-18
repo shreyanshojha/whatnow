@@ -20,6 +20,7 @@ export type IconName =
   | 'social-solo'
   | 'social-someone'
   | 'social-group'
+  | 'kids'
   | 'clock'
   | 'energy-low'
   | 'energy-medium'
@@ -118,7 +119,7 @@ function draw(name: IconName, s: StrokeProps, color: string) {
           <Line {...s} x1="16" y1="15" x2="15" y2="18.5" />
         </>
       );
-    case 'wired':
+    case 'frustrated':
       return <Path {...s} d="M13 2 4.5 14H10l-1 8 10-13h-5.5z" />;
     case 'content':
       return (
@@ -268,6 +269,16 @@ function draw(name: IconName, s: StrokeProps, color: string) {
           <Path {...s} d="M2.8 19c.2-2.5 1.7-4.1 3.8-4.1" />
           <Path {...s} d="M21.2 19c-.2-2.5-1.7-4.1-3.8-4.1" />
           <Path {...s} d="M7.7 19c.3-2.9 1.9-4.8 4.3-4.8s4 1.9 4.3 4.8" />
+        </>
+      );
+
+    case 'kids':
+      return (
+        <>
+          <Circle {...s} cx="7.5" cy="7.6" r="3.1" />
+          <Path {...s} d="M2.5 19c0-3.3 2.2-5.6 5-5.6s5 2.3 5 5.6" />
+          <Circle {...s} cx="17" cy="11.2" r="2" />
+          <Path {...s} d="M13.3 19c.2-2.4 1.8-3.9 3.7-3.9s3.5 1.5 3.7 3.9" />
         </>
       );
 

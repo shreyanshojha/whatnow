@@ -35,11 +35,18 @@ export interface PlanInput {
   setting: Place;
   budget: 'free' | 'cheap' | 'treat';
   weather: WeatherState | null;
+  /** When true, only surface activities tagged kidFriendly (see
+   * data/activities.ts) — a cross-cutting filter independent of the
+   * solo/someone/group headcount, since "kids along" can be true at
+   * any group size. */
+  withKids?: boolean;
 }
 
 function passesConstraints(a: Activity, input: PlanInput): boolean {
   // Time: activity's needed time must fit inside available window
   if (a.time > input.time) return false;
+  // Kids along: a cross-cutting content filter, independent of headcount
+  if (input.withKids && !a.kidFriendly) return false;
   // Social
   if (!a.soc.includes(input.social)) return false;
   // Setting
