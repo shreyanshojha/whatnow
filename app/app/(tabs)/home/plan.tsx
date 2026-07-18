@@ -44,6 +44,7 @@ export default function PlanScreen() {
     nearbySearchLoading,
     lookOnlineNearby,
     aiApiKey,
+    sharedAiAvailable,
     lastPlan,
     planSource,
     planLoading,
@@ -170,7 +171,7 @@ export default function PlanScreen() {
 
       <NearbyRightNow nearby={nearby} events={nearbyEvents} eventsLoading={eventsLoading} />
 
-      {aiApiKey ? (
+      {aiApiKey || sharedAiAvailable ? (
         <LookOnlineNearby
           results={nearbySearchResults}
           loading={nearbySearchLoading}

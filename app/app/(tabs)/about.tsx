@@ -29,6 +29,7 @@ export default function AboutScreen() {
     setAiEnabled,
     aiApiKey,
     setAiApiKey,
+    sharedAiAvailable,
     eventsApiKey,
     setEventsApiKey,
     clearLocationHistory,
@@ -182,14 +183,19 @@ export default function AboutScreen() {
           />
         </View>
         <Text style={styles.cardP}>
-          When it's on, WhatNow asks an AI to compose a fresh plan for this exact moment
-          instead of picking from the built-in list. Bring your own API key — it's stored
-          only on this device (in the OS keychain) and sent directly from your phone to the
-          provider, never through a WhatNow server. If it's off, the key is missing, or a
-          request fails for any reason, WhatNow falls back to its built-in matching engine
-          instantly — you'll never see a broken plan. To keep any one day's usage
-          reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans per
-          day (resets at midnight) — after that, it simply uses the built-in engine until
+          {sharedAiAvailable
+            ? "During the beta, this works automatically for you — no key needed. Your plans " +
+              "are composed by a shared key with a fair daily cap per person, so if you hit " +
+              "it, WhatNow just uses its built-in matching engine until tomorrow, same as ever. "
+            : ''}
+          When it's on below, WhatNow asks an AI to compose a fresh plan for this exact moment
+          instead of picking from the built-in list{sharedAiAvailable ? ' using your own key instead of the shared one' : ''}.
+          Bring your own API key — it's stored only on this device (in the OS keychain) and sent
+          directly from your phone to the provider, never through a WhatNow server. If it's off,
+          the key is missing, or a request fails for any reason, WhatNow falls back to its
+          built-in matching engine instantly — you'll never see a broken plan. To keep any one
+          day's usage reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans
+          per day (resets at midnight) — after that, it simply uses the built-in engine until
           tomorrow. The same key also powers the optional "Look online nearby" search on
           your plan screen, which looks up real local events and new movies playing near
           you — that's a separate, smaller daily cap, shown next to its own search button.

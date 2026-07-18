@@ -13,7 +13,13 @@
    Claude's native web_search tool. Nothing passes through a WhatNow
    server. Fully optional and additive — any failure just means the
    "Look online nearby" section quietly doesn't appear.
+
+   During the beta (see lib/betaConfig.ts), signed-in people without
+   their own key go through the same ai-proxy Edge Function used by
+   lib/aiPlan.ts instead — see the dual-transport branch below.
    ============================================================ */
+
+import { SUPABASE_URL } from './supabase';
 
 export interface NearbyResult {
   name: string;
@@ -23,8 +29,13 @@ export interface NearbyResult {
 }
 
 export interface NearbySearchConfig {
-  apiKey: string;
-  /** Defaults to the same fast, inexpensive model used for AI planning. */
+  /** Bring-your-own-key path: set this to call Anthropic directly. Takes
+   * precedence over `sharedAccessToken` if both are set. */
+  apiKey?: string;
+  /** Beta shared-key path — see lib/betaConfig.ts and lib/aiPlan.ts. */
+  sharedAccessToken?: string;
+  /** Defaults to the same fast, inexpensive model used for AI planning.
+   * Ignored on the shared-key path, which the server decides instead. */
   model?: string;
   /** Ms before the request is aborted. Web search can take longer than
    * plain generation since it may run several searches — default 25s. */
@@ -108,31 +119,50 @@ export async function searchNearby(
   config: NearbySearchConfig,
   placeName: string | null = null
 ): Promise<NearbyResult[] | null> {
-  if (!config.apiKey || !config.apiKey.trim()) return null;
+  const hasByok = !!config.apiKey && !!config.apiKey.trim();
+  const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
+  if (!hasByok && !hasShared) return null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_TIMEOUT);
 
+  const system =
+    'You search the live web and return only clean, valid JSON — no prose, ' +
+    'no markdown, and never a fabricated URL.';
+  const messages = [{ role: 'user', content: buildPrompt(placeName) }];
+  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: MAX_SEARCHES }];
+
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': config.apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: config.model ?? DEFAULT_MODEL,
-        max_tokens: 1500,
-        system:
-          'You search the live web and return only clean, valid JSON — no prose, ' +
-          'no markdown, and never a fabricated URL.',
-        messages: [{ role: 'user', content: buildPrompt(placeName) }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: MAX_SEARCHES }],
-      }),
-    });
+    let res: Response;
+    if (hasByok) {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': config.apiKey!.trim(),
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: config.model ?? DEFAULT_MODEL,
+          max_tokens: 1500,
+          system,
+          messages,
+          tools,
+        }),
+      });
+    } else {
+      res = await fetch(`${SUPABASE_URL}/functions/v1/ai-proxy`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${config.sharedAccessToken!.trim()}`,
+        },
+        body: JSON.stringify({ kind: 'nearby_search', max_tokens: 1500, system, messages, tools }),
+      });
+    }
 
     if (!res.ok) return null;
     const data = await res.json();

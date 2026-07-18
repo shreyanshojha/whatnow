@@ -13,8 +13,16 @@
    device (see lib/secureSettings.ts) and is sent directly from
    the device to the provider. Nothing passes through any server
    WhatNow controls, and nothing is bundled into the app build.
+
+   During the beta (see lib/betaConfig.ts), signed-in people without
+   their own key instead go through the ai-proxy Supabase Edge
+   Function, which holds a shared key server-side and enforces real
+   caps a client can't bypass. Both paths share every line of prompt
+   building and response validation below — only the transport (who
+   we send the finished request to) differs.
    ============================================================ */
 
+import { SUPABASE_URL } from './supabase';
 import {
   Activity,
   CatId,
@@ -33,7 +41,12 @@ import { PlanInput, planCount } from './plan';
 export type AiProvider = 'anthropic';
 
 export interface AiPlanConfig {
-  apiKey: string;
+  /** Bring-your-own-key path: set this to call Anthropic directly from the
+   * device. Takes precedence over `sharedAccessToken` if both are set. */
+  apiKey?: string;
+  /** Beta shared-key path: a signed-in user's Supabase access token, used
+   * to call the ai-proxy Edge Function instead (see lib/betaConfig.ts). */
+  sharedAccessToken?: string;
   provider?: AiProvider;
   /** Defaults to a fast, inexpensive model — plenty for short structured JSON. */
   model?: string;
@@ -268,39 +281,63 @@ export async function generateAiPlan(
   avoidTitles: string[] = [],
   nearbyVenues: NearbyVenueName[] = []
 ): Promise<Activity[] | null> {
-  if (!config.apiKey || !config.apiKey.trim()) return null;
+  const hasByok = !!config.apiKey && !!config.apiKey.trim();
+  const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
+  if (!hasByok && !hasShared) return null;
   const provider = config.provider ?? 'anthropic';
+  if (provider !== 'anthropic') return null; // only provider implemented today
   const count = planCount(input.time);
   const prompt = buildPrompt(input, count, nearbyName, patternHint, avoidTitles, nearbyVenues);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_TIMEOUT);
 
+  const system =
+    'You are the planning engine inside a mood-based activity app called WhatNow. ' +
+    'You output only valid JSON, nothing else — no prose, no markdown code fences.';
+
   try {
-    if (provider !== 'anthropic') return null; // only provider implemented today
+    let res: Response;
+    if (hasByok) {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': config.apiKey!.trim(),
+          'anthropic-version': '2023-06-01',
+          // Harmless for native fetch; required if this is ever called from a browser context.
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: config.model ?? DEFAULT_MODEL,
+          max_tokens: 1200,
+          temperature: 1,
+          system,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+    } else {
+      // Beta shared-key path — see lib/betaConfig.ts. The server decides the
+      // actual model and enforces its own caps; this is just the request shape.
+      res = await fetch(`${SUPABASE_URL}/functions/v1/ai-proxy`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${config.sharedAccessToken!.trim()}`,
+        },
+        body: JSON.stringify({
+          kind: 'plan',
+          max_tokens: 1200,
+          temperature: 1,
+          system,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+    }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': config.apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-        // Harmless for native fetch; required if this is ever called from a browser context.
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: config.model ?? DEFAULT_MODEL,
-        max_tokens: 1200,
-        temperature: 1,
-        system:
-          'You are the planning engine inside a mood-based activity app called WhatNow. ' +
-          'You output only valid JSON, nothing else — no prose, no markdown code fences.',
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!res.ok) return null;
+    if (!res.ok) return null; // covers a hit cap, an expired session, etc. — silent fallback
     const data = await res.json();
     const text: unknown = data?.content?.[0]?.text;
     if (typeof text !== 'string') return null;

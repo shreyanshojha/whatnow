@@ -21,6 +21,7 @@ import React, {
 import { ACTIVITIES, Activity, Energy, MoodId, Place, Social, TimeVal } from '../data/activities';
 import { useAuth } from './AuthContext';
 import { generateAiPlan } from '../lib/aiPlan';
+import { SHARED_BETA_AI_ENABLED } from '../lib/betaConfig';
 import { cancelCompletionNotification, scheduleCompletionNotification } from '../lib/completionCheck';
 import { fetchNearbyEvents, LiveEvent } from '../lib/events';
 import {
@@ -157,6 +158,11 @@ interface PlanContextValue {
   setAiEnabled: (v: boolean) => void;
   aiApiKey: string;
   setAiApiKey: (key: string) => void;
+  /** True when a signed-in person without their own BYOK key gets AI
+   * planning + "Look online nearby" automatically via the shared beta
+   * backend (see lib/betaConfig.ts) — lets screens gate UI on "is AI
+   * available at all" without caring which path is actually in use. */
+  sharedAiAvailable: boolean;
   // Live nearby events (optional, bring-your-own-key)
   eventsApiKey: string;
   setEventsApiKey: (key: string) => void;
@@ -175,7 +181,12 @@ interface PlanContextValue {
 const Ctx = createContext<PlanContextValue | null>(null);
 
 export function PlanProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  // Beta: signed-in people without their own BYOK key get AI planning +
+  // "Look online nearby" automatically via the shared, capped ai-proxy
+  // backend — see lib/betaConfig.ts. A BYOK key, once set and enabled,
+  // always takes precedence over the shared path.
+  const sharedAiAvailable = SHARED_BETA_AI_ENABLED && !!user && !!session?.access_token;
   const [mood, setMood] = useState<MoodId | null>(null);
   const [energy, setEnergy] = useState<Energy>('medium');
   const [time, setTime] = useState<TimeVal>(60);
@@ -402,7 +413,11 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         let planSourceForSync: 'engine' | 'ai' = 'engine';
         const excludeIds = options.excludeIds;
 
-        if (aiEnabled && aiApiKey && (await canUseAiPlanToday())) {
+        const byokReady = aiEnabled && !!aiApiKey && (await canUseAiPlanToday());
+        // BYOK, once configured and enabled, always wins over the shared beta
+        // path — someone who's brought their own key gets their own limits.
+        const useShared = !byokReady && sharedAiAvailable;
+        if (byokReady || useShared) {
           // Pattern hint is computed fresh from on-device history only — never stored,
           // never sent anywhere except as part of this one plan request.
           const patternHint = await getPatternHint(input.mood);
@@ -411,7 +426,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
             : [];
           const aiActivities = await generateAiPlan(
             input,
-            { apiKey: aiApiKey },
+            byokReady ? { apiKey: aiApiKey } : { sharedAccessToken: session?.access_token },
             nearbyRef.current?.placeName ?? null,
             patternHint,
             avoidTitles,
@@ -421,8 +436,10 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
             cards = aiActivities.map((activity) => ({ activity, index: null, mood: input.mood }));
             setPlanSource('ai');
             planSourceForSync = 'ai';
-            await recordAiPlanUse();
-            refreshUsageCounts();
+            if (byokReady) {
+              await recordAiPlanUse();
+              refreshUsageCounts();
+            }
           }
         }
 
@@ -457,6 +474,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       freeformDescription,
       aiEnabled,
       aiApiKey,
+      sharedAiAvailable,
+      session,
       refreshUsageCounts,
       lastPlan,
     ]
@@ -494,22 +513,25 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
    * clears results on any failure so the section just disappears rather
    * than showing something broken. See lib/nearbySearch.ts. */
   const lookOnlineNearby = useCallback(async (): Promise<void> => {
-    if (!aiApiKey || !(await canUseNearbySearchToday())) {
+    const byokReady = !!aiApiKey && (await canUseNearbySearchToday());
+    const useShared = !byokReady && sharedAiAvailable;
+    if (!byokReady && !useShared) {
       setNearbySearchResults(null);
       return;
     }
     setNearbySearchLoading(true);
     try {
-      const results = await searchNearby({ apiKey: aiApiKey }, nearbyRef.current?.placeName ?? null);
+      const config = byokReady ? { apiKey: aiApiKey } : { sharedAccessToken: session?.access_token };
+      const results = await searchNearby(config, nearbyRef.current?.placeName ?? null);
       setNearbySearchResults(results);
-      if (results) {
+      if (results && byokReady) {
         await recordNearbySearchUse();
         refreshUsageCounts();
       }
     } finally {
       setNearbySearchLoading(false);
     }
-  }, [aiApiKey, refreshUsageCounts]);
+  }, [aiApiKey, sharedAiAvailable, session, refreshUsageCounts]);
 
   const requestLocation = useCallback((): Promise<void> => {
     // Registered in locationPromiseRef so makePlan can wait for this exact
@@ -675,6 +697,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setAiEnabled,
     aiApiKey,
     setAiApiKey,
+    sharedAiAvailable,
     eventsApiKey,
     setEventsApiKey,
     clearLocationHistory,
