@@ -106,6 +106,62 @@ export async function clearFeedback(): Promise<void> {
   }
 }
 
+/** A small, user-facing (not admin) summary of this device's own history —
+ * shown back to the person as "your patterns," not tracked for anyone
+ * else's benefit. Deliberately built entirely from data that already
+ * exists in this log; nothing new is collected to produce it. */
+export interface PersonalStats {
+  totalPlans: number;
+  topMood: MoodId | null;
+  thumbsUp: number;
+  thumbsDown: number;
+  /** Consecutive days (ending today or yesterday) with at least one plan
+   * generated — a simple, honest streak, not inflated by same-day reshuffles. */
+  streakDays: number;
+}
+
+function localDateKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export async function getPersonalStats(): Promise<PersonalStats> {
+  const log = await readLog();
+  const shown = log.filter((r) => r.event === 'shown');
+
+  // Each call to recordShown stamps every id in that one plan with the same
+  // `at` — so distinct timestamps among "shown" events is exactly the
+  // number of plans generated, without needing a separate counter.
+  const totalPlans = new Set(shown.map((r) => r.at)).size;
+
+  const moodCounts = new Map<MoodId, number>();
+  for (const r of shown) moodCounts.set(r.mood, (moodCounts.get(r.mood) ?? 0) + 1);
+  let topMood: MoodId | null = null;
+  let topCount = 0;
+  for (const [m, c] of moodCounts) {
+    if (c > topCount) {
+      topCount = c;
+      topMood = m;
+    }
+  }
+
+  const thumbsUp = log.filter((r) => r.event === 'thumbsUp').length;
+  const thumbsDown = log.filter((r) => r.event === 'thumbsDown').length;
+
+  const activeDays = new Set(shown.map((r) => localDateKey(r.at)));
+  let streakDays = 0;
+  const cursor = new Date();
+  if (!activeDays.has(localDateKey(cursor.getTime()))) {
+    cursor.setDate(cursor.getDate() - 1); // today's empty so far — a streak can still be "live" through yesterday
+  }
+  while (activeDays.has(localDateKey(cursor.getTime()))) {
+    streakDays += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return { totalPlans, topMood, thumbsUp, thumbsDown, streakDays };
+}
+
 /** Raw per-activity, per-mood counts behind a scoring weight — exposed so
  * the UI can show an honest, auditable "why this, for you specifically"
  * line (see personalizationNote below) instead of just quietly using the

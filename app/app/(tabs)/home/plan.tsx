@@ -52,6 +52,7 @@ export default function PlanScreen() {
     toggleSave,
     saved,
     resetFlow,
+    freeformDescription,
   } = usePlan();
   // Bump a key on reshuffle so cards re-mount + replay their reveal.
   const [nonce, setNonce] = React.useState(0);
@@ -70,7 +71,12 @@ export default function PlanScreen() {
       contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}
       showsVerticalScrollIndicator={false}
     >
-      {moodMeta ? (
+      {freeformDescription ? (
+        <View style={styles.h1Row}>
+          <Icon name="other" size={24} color={colors.coralDeep} strokeWidth={1.7} />
+          <Text style={styles.h1}>For "{freeformDescription}" — here's your plan.</Text>
+        </View>
+      ) : moodMeta ? (
         <View style={styles.h1Row}>
           <Icon name={moodMeta.id} size={26} color={moodMeta.color} strokeWidth={1.7} />
           <Text style={styles.h1}>Feeling {moodMeta.word}? Here's your plan.</Text>

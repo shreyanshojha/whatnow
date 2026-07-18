@@ -9,6 +9,7 @@ import {
   clearFeedback,
   getFeedbackWeights,
   getPersonalSignal,
+  getPersonalStats,
   personalizationNote,
   recordAccepted,
   recordExplicitFeedback,
@@ -150,5 +151,51 @@ describe('getPersonalSignal + personalizationNote', () => {
     await recordExplicitFeedback('hike', 'restless', false);
     const signal = await getPersonalSignal('hike', 'restless');
     expect(personalizationNote(signal, 'restless')).toBeNull();
+  });
+});
+
+describe('getPersonalStats', () => {
+  it('returns all-zero stats for an empty log', async () => {
+    const stats = await getPersonalStats();
+    expect(stats).toEqual({ totalPlans: 0, topMood: null, thumbsUp: 0, thumbsDown: 0, streakDays: 0 });
+  });
+
+  it('counts one plan per distinct recordShown call, not per activity', async () => {
+    await recordShown(['a', 'b', 'c'], 'restless'); // one plan, 3 activities
+    const stats = await getPersonalStats();
+    expect(stats.totalPlans).toBe(1);
+  });
+
+  it('counts multiple separate plan generations correctly', async () => {
+    await recordShown(['a', 'b'], 'restless');
+    await new Promise((r) => setTimeout(r, 2)); // ensure a distinct timestamp
+    await recordShown(['c', 'd'], 'curious');
+    const stats = await getPersonalStats();
+    expect(stats.totalPlans).toBe(2);
+  });
+
+  it('identifies the most frequently shown mood', async () => {
+    await recordShown(['a'], 'restless');
+    await new Promise((r) => setTimeout(r, 2));
+    await recordShown(['b'], 'restless');
+    await new Promise((r) => setTimeout(r, 2));
+    await recordShown(['c'], 'curious');
+    const stats = await getPersonalStats();
+    expect(stats.topMood).toBe('restless');
+  });
+
+  it('tallies explicit thumbs-up and thumbs-down separately', async () => {
+    await recordExplicitFeedback('a', 'restless', true);
+    await recordExplicitFeedback('b', 'restless', true);
+    await recordExplicitFeedback('c', 'restless', false);
+    const stats = await getPersonalStats();
+    expect(stats.thumbsUp).toBe(2);
+    expect(stats.thumbsDown).toBe(1);
+  });
+
+  it('gives a fresh, same-day-only log a 1-day streak', async () => {
+    await recordShown(['a'], 'restless');
+    const stats = await getPersonalStats();
+    expect(stats.streakDays).toBe(1);
   });
 });

@@ -37,15 +37,23 @@ interface Props {
   onToggleSave: (activity: Activity) => void;
 }
 
-// Which amenity kind (if any) each category can name a real nearby spot for.
+// Which amenity kinds (if any) each category can name a real nearby spot
+// for — deliberately covers every category except reset, which is almost
+// always a private, at-home task ("tidy a shelf") that a place name can't
+// make more concrete. Order matters: the first kind with a real match wins.
 const CAT_TO_AMENITY: Record<string, string[]> = {
   move: ['gym', 'park'],
-  explore: ['park', 'cafe', 'library'],
+  explore: ['park', 'museum', 'cinema', 'bookstore'],
   rest: ['park', 'cafe'],
-  learn: ['library', 'cafe'],
-  indulge: ['cafe'],
-  connect: ['cafe', 'park'],
+  learn: ['library', 'museum', 'bookstore', 'cafe'],
+  indulge: ['cafe', 'restaurant', 'bar'],
+  connect: ['cafe', 'restaurant', 'bar', 'park'],
+  create: ['cafe', 'bookstore'],
 };
+
+function formatDistance(m: number): string {
+  return m < 1000 ? `${m}m away` : `${(m / 1000).toFixed(1)}km away`;
+}
 
 export function ActivityCard({
   activity,
@@ -125,12 +133,17 @@ export function ActivityCard({
     recordExplicitFeedback(a.id, mood, positive).catch(() => {});
   };
 
-  // Surface a real nearby amenity as a gentle tip when it fits the category.
-  const amenity = nearby?.amenity;
-  const showTip =
-    amenity &&
-    CAT_TO_AMENITY[a.cat]?.includes(amenity.kind) &&
-    (a.place === 'outdoor' || a.place === 'either' || amenity.kind !== 'park');
+  // Surface a real, specific nearby spot instead of leaving "go somewhere"
+  // vague — the nearest venue (of a kind this category actually calls for)
+  // from the fuller list Overpass returned, not just whichever one place.ts
+  // happened to pick for the "Nearby right now" section.
+  const matchingKinds = CAT_TO_AMENITY[a.cat];
+  const matchedVenue = matchingKinds
+    ? (nearby?.venues ?? []).find(
+        (v) => matchingKinds.includes(v.kind) && (a.place === 'outdoor' || a.place === 'either' || v.kind !== 'park')
+      )
+    : undefined;
+  const showTip = !!matchedVenue;
 
   return (
     <Animated.View
@@ -191,11 +204,11 @@ export function ActivityCard({
         <Text style={styles.whyText}>{whyFor(a, mood)}</Text>
       </View>
 
-      {showTip && amenity ? (
+      {showTip && matchedVenue ? (
         <View style={styles.tipRow}>
           <Icon name="pin" size={13} color={colors.inkSoft} strokeWidth={1.9} />
           <Text style={styles.tip}>
-            Near you: <Text style={styles.tipStrong}>{amenity.name}</Text>
+            Try <Text style={styles.tipStrong}>{matchedVenue.name}</Text> — {formatDistance(matchedVenue.distanceM)}
           </Text>
         </View>
       ) : null}

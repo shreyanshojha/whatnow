@@ -40,6 +40,13 @@ export interface PlanInput {
    * solo/someone/group headcount, since "kids along" can be true at
    * any group size. */
   withKids?: boolean;
+  /** Raw text from the "Other — type what you want" mood option, kept
+   * alongside the closest-matching MoodId bucket (see lib/moodMatch.ts).
+   * The deterministic engine below never reads this — it has no way to
+   * act on free text — but lib/aiPlan.ts gives it far more weight than
+   * the bucket label when AI planning is on. Undefined for the normal
+   * pick-a-mood-tile flow. */
+  freeform?: string;
 }
 
 function passesConstraints(a: Activity, input: PlanInput): boolean {

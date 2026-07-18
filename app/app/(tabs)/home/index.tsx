@@ -7,27 +7,68 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../../components/Icon';
 import { MOODS, MoodId } from '../../../data/activities';
-import { usePlan } from '../../../context/PlanContext';
+import { SavedEntry, usePlan } from '../../../context/PlanContext';
+import { dismissCompletionCheck, getPendingCompletionCheck } from '../../../lib/completionCheck';
+import { recordExplicitFeedback } from '../../../lib/feedback';
+import { matchMoodFromText } from '../../../lib/moodMatch';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 
 export default function MoodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { mood, setMood } = usePlan();
+  const { mood, setMood, freeformDescription, setFreeformDescription, saved } = usePlan();
+  const [otherOpen, setOtherOpen] = React.useState(!!freeformDescription);
+  const [draft, setDraft] = React.useState(freeformDescription);
+  const [checkIn, setCheckIn] = React.useState<SavedEntry | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getPendingCompletionCheck(saved).then((entry) => {
+      if (!cancelled) setCheckIn(entry);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only re-check when the saved list itself changes — not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved]);
+
+  const answerCheckIn = (positive: boolean | null) => {
+    if (!checkIn) return;
+    if (positive !== null) {
+      recordExplicitFeedback(checkIn.activity.id, checkIn.mood, positive).catch(() => {});
+    }
+    dismissCompletionCheck(checkIn.activity.id).catch(() => {});
+    setCheckIn(null);
+  };
 
   const pick = (id: MoodId) => {
     setMood(id);
+    setFreeformDescription(''); // a real mood tile always wins over stale freeform text
+    setOtherOpen(false);
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
     }
   };
 
-  const selectedWord = mood ? MOODS.find((m) => m.id === mood)?.word : null;
+  const submitOther = () => {
+    const text = draft.trim();
+    if (!text) return;
+    const matched = matchMoodFromText(text);
+    setMood(matched);
+    setFreeformDescription(text);
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    router.push('/home/context');
+  };
+
+  const selectedWord =
+    mood && !freeformDescription ? MOODS.find((m) => m.id === mood)?.word : null;
 
   return (
     <View style={styles.root}>
@@ -41,6 +82,37 @@ export default function MoodScreen() {
         <Text style={styles.brand}>
           What<Text style={{ color: colors.coral }}>Now</Text>
         </Text>
+
+        {checkIn ? (
+          <View style={styles.checkInCard}>
+            <View style={styles.checkInHeaderRow}>
+              <Icon name="streak" size={16} color={colors.amber} strokeWidth={1.8} />
+              <Text style={styles.checkInHeader}>Quick check-in</Text>
+            </View>
+            <Text style={styles.checkInBody}>
+              Last time, you saved "{checkIn.activity.t}" — did it end up happening?
+            </Text>
+            <View style={styles.checkInRow}>
+              <Pressable
+                onPress={() => answerCheckIn(true)}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.checkInBtn, styles.checkInBtnYes, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.checkInBtnYesText}>Yes, it helped</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => answerCheckIn(false)}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.checkInBtn, styles.checkInBtnNo, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.checkInBtnNoText}>Not really</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={() => answerCheckIn(null)} accessibilityRole="button">
+              <Text style={styles.checkInSkip}>Skip</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <Text style={styles.tagline}>Plans around your mood, not your calendar.</Text>
         <Text style={styles.h1}>How are you feeling right now?</Text>
@@ -77,6 +149,53 @@ export default function MoodScreen() {
             );
           })}
         </View>
+
+        <Pressable
+          onPress={() => setOtherOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: !!freeformDescription }}
+          style={[styles.otherRow, !!freeformDescription && styles.otherRowActive]}
+        >
+          <Icon
+            name="other"
+            size={18}
+            color={freeformDescription ? colors.coralDeep : colors.inkFaint}
+            strokeWidth={1.7}
+          />
+          <Text style={[styles.otherRowText, !!freeformDescription && { color: colors.coralDeep }]}>
+            {freeformDescription ? `"${freeformDescription}"` : "None of these — let me tell you"}
+          </Text>
+        </Pressable>
+
+        {otherOpen ? (
+          <View style={styles.otherBox}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="How are you actually feeling right now?"
+              placeholderTextColor={colors.inkFaint}
+              multiline
+              style={styles.otherInput}
+            />
+            <Pressable
+              onPress={submitOther}
+              disabled={!draft.trim()}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.otherSubmit,
+                !draft.trim() && styles.ctaDisabled,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.otherSubmitText}>Use this</Text>
+              <Icon name="arrow-right" size={15} color={colors.white} strokeWidth={2.1} />
+            </Pressable>
+            <Text style={styles.otherHint}>
+              WhatNow will match this to the closest mood under the hood, but your own words —
+              not just that label — shape the suggestions when AI planning is on.
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
@@ -84,6 +203,8 @@ export default function MoodScreen() {
           <Text style={styles.footerHint}>
             Feeling {selectedWord}. Let's tailor it.
           </Text>
+        ) : otherOpen ? (
+          <Text style={styles.footerHintFaint}>Tap "Use this" above to continue</Text>
         ) : (
           <Text style={styles.footerHintFaint}>Tap a mood to begin</Text>
         )}
@@ -156,6 +277,78 @@ const styles = StyleSheet.create({
     ...font.semibold,
     color: colors.inkSoft,
     textTransform: 'capitalize',
+  },
+  otherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  otherRowActive: { borderColor: colors.coral, backgroundColor: colors.coralTint },
+  otherRowText: { flex: 1, fontSize: 13.5, ...font.medium, color: colors.inkSoft },
+  otherBox: {
+    marginTop: 10,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 14,
+  },
+  otherInput: {
+    fontSize: 14.5,
+    color: colors.ink,
+    ...font.regular,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+  },
+  otherSubmit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.coralDeep,
+    borderRadius: radius.pill,
+    paddingVertical: 11,
+    marginBottom: 8,
+  },
+  otherSubmitText: { fontSize: 14, ...font.bold, color: colors.white },
+  otherHint: { fontSize: 12, color: colors.inkFaint, ...font.regular, lineHeight: 17 },
+  checkInCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 16,
+    marginBottom: 20,
+    ...shadow.soft,
+  },
+  checkInHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  checkInHeader: { fontSize: 12.5, ...font.bold, color: colors.amber, textTransform: 'uppercase', letterSpacing: 0.4 },
+  checkInBody: { fontSize: 14.5, ...font.medium, color: colors.ink, lineHeight: 21, marginBottom: 12 },
+  checkInRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  checkInBtn: {
+    flex: 1,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  checkInBtnYes: { backgroundColor: colors.sage, borderColor: colors.sage },
+  checkInBtnYesText: { fontSize: 13.5, ...font.bold, color: colors.white },
+  checkInBtnNo: { backgroundColor: 'transparent', borderColor: colors.line },
+  checkInBtnNoText: { fontSize: 13.5, ...font.semibold, color: colors.inkSoft },
+  checkInSkip: {
+    fontSize: 12.5,
+    ...font.medium,
+    color: colors.inkFaint,
+    textAlign: 'center',
   },
   footer: {
     position: 'absolute',

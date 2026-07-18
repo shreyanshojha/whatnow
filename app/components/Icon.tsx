@@ -57,7 +57,10 @@ export type IconName =
   | 'trash'
   | 'arrow-right'
   | 'arrow-left'
-  | 'shield';
+  | 'shield'
+  | 'other'
+  | 'streak'
+  | 'chart';
 
 interface IconProps {
   name: IconName;
@@ -503,6 +506,32 @@ function draw(name: IconName, s: StrokeProps, color: string) {
         <>
           <Path {...s} d="M12 3.2 19.5 6v6.3c0 4.7-3.3 7.7-7.5 8.5-4.2-.8-7.5-3.8-7.5-8.5V6z" />
           <Path {...s} d="M8.7 12.2l2.2 2.2 4.4-4.6" />
+        </>
+      );
+
+    case 'streak':
+      return (
+        <Path
+          {...s}
+          d="M12 2.5c1 3 .3 4.4-1 5.8-1.6 1.7-2.5 3.3-2.5 5.2A5.5 5.5 0 0 0 14 19a4 4 0 0 0 2-7.5c.6 1.4.3 2.5-.4 3.3.6-3-1-4-1.4-6.3-.3 1.3-1 2-2 2.4.2-2.8-.5-5-2-9.4z"
+        />
+      );
+    case 'chart':
+      return (
+        <>
+          <Line {...s} x1="4" y1="4" x2="4" y2="20" />
+          <Line {...s} x1="4" y1="20" x2="21" y2="20" />
+          <Rect x="7.5" y="13" width="3" height="7" rx="0.6" fill={color} stroke="none" />
+          <Rect x="12.5" y="9" width="3" height="11" rx="0.6" fill={color} stroke="none" />
+          <Rect x="17.5" y="6" width="3" height="14" rx="0.6" fill={color} stroke="none" />
+        </>
+      );
+    case 'other':
+      return (
+        <>
+          <Path {...s} d="M4 17c0-6 4-10 8-10s8 4 8 10" />
+          <Line {...s} x1="12" y1="10.5" x2="12" y2="13.2" />
+          <Circle cx="12" cy="16.3" r="1.1" fill={color} stroke="none" />
         </>
       );
 

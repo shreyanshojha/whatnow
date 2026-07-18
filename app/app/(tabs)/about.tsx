@@ -17,6 +17,7 @@ import { Icon } from '../../components/Icon';
 import { PRIVACY_POLICY_VERSION, useAuth } from '../../context/AuthContext';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
+import { getPersonalStats, PersonalStats } from '../../lib/feedback';
 import { fetchReferralInfo } from '../../lib/sync';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
 import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../../lib/usageLimits';
@@ -119,6 +120,7 @@ export default function AboutScreen() {
       </Text>
 
       <AccountCard />
+      <YourPatterns />
 
       <View style={styles.card}>
         <Text style={styles.cardH}>How it works</Text>
@@ -508,6 +510,67 @@ function AccountCard() {
   );
 }
 
+/** A small, upbeat mirror of someone's own on-device history — "your
+ * patterns," not admin analytics. Built entirely from data that already
+ * exists in lib/feedback.ts's local log; nothing new is collected to show
+ * it, and it disappears cleanly for anyone with no history yet. */
+function YourPatterns() {
+  const [stats, setStats] = React.useState<PersonalStats | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getPersonalStats().then((s) => {
+      if (!cancelled) setStats(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!stats || stats.totalPlans === 0) return null;
+
+  const topMoodMeta = stats.topMood ? MOODS.find((m) => m.id === stats.topMood) : null;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.acctHeaderRow}>
+        <Icon name="chart" size={19} color={colors.ink} strokeWidth={1.7} />
+        <Text style={styles.cardH}>Your patterns</Text>
+      </View>
+      <View style={styles.statsRow}>
+        <View style={styles.statBox}>
+          <Text style={styles.statNum}>{stats.totalPlans}</Text>
+          <Text style={styles.statLabel}>{stats.totalPlans === 1 ? 'plan made' : 'plans made'}</Text>
+        </View>
+        {stats.streakDays >= 2 ? (
+          <View style={styles.statBox}>
+            <View style={styles.statNumRow}>
+              <Icon name="streak" size={17} color={colors.amber} strokeWidth={1.6} />
+              <Text style={styles.statNum}>{stats.streakDays}</Text>
+            </View>
+            <Text style={styles.statLabel}>day streak</Text>
+          </View>
+        ) : null}
+        {stats.thumbsUp + stats.thumbsDown > 0 ? (
+          <View style={styles.statBox}>
+            <Text style={styles.statNum}>{stats.thumbsUp}</Text>
+            <Text style={styles.statLabel}>good calls confirmed</Text>
+          </View>
+        ) : null}
+      </View>
+      {topMoodMeta ? (
+        <View style={styles.topMoodRow}>
+          <Icon name={topMoodMeta.id} size={16} color={topMoodMeta.color} strokeWidth={1.8} />
+          <Text style={[styles.cardP, { flex: 1 }]}>
+            You've reached for WhatNow feeling{' '}
+            <Text style={font.semibold}>{topMoodMeta.word}</Text> more than anything else so far.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function InviteFriends() {
   const [info, setInfo] = React.useState<{ code: string; count: number } | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -646,6 +709,19 @@ const styles = StyleSheet.create({
     color: colors.inkFaint,
   },
   acctHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  statBox: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  statNumRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statNum: { fontSize: 22, ...fontDisplay.bold, color: colors.ink },
+  statLabel: { fontSize: 11, color: colors.inkFaint, ...font.medium, textAlign: 'center', marginTop: 2 },
+  topMoodRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inviteBox: {
     backgroundColor: colors.bg,
     borderRadius: radius.md,

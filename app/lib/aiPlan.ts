@@ -73,18 +73,34 @@ const VALID_COST = new Set<Cost>(['free', 'cheap', 'treat']);
 const VALID_SOCIAL = new Set<Social>(['solo', 'someone', 'group']);
 const VALID_TIME = new Set<TimeVal>([15, 60, 240]);
 
+export interface NearbyVenueName {
+  name: string;
+  kind: string;
+}
+
 function buildPrompt(
   input: PlanInput,
   count: number,
   nearbyName: string | null,
   patternHint: string | null,
-  avoidTitles: string[] = []
+  avoidTitles: string[] = [],
+  nearbyVenues: NearbyVenueName[] = []
 ): string {
   const lines: string[] = [];
-  lines.push(
-    `Someone feels "${input.mood}" right now. Build them exactly ${count} small activity ` +
-      `suggestions tailored to this specific moment — not generic advice.`
-  );
+  if (input.freeform && input.freeform.trim()) {
+    lines.push(
+      `Someone described how they feel right now, in their own words: "${input.freeform.trim()}". ` +
+        `Treat this as the real signal — it matters far more than any single mood label. ` +
+        `("${input.mood}" is only a rough automatic bucket a keyword match landed on; if it ` +
+        `doesn't quite fit what they actually wrote, trust what they wrote instead.) Build them ` +
+        `exactly ${count} small activity suggestions tailored specifically to what they said — not generic advice.`
+    );
+  } else {
+    lines.push(
+      `Someone feels "${input.mood}" right now. Build them exactly ${count} small activity ` +
+        `suggestions tailored to this specific moment — not generic advice.`
+    );
+  }
   lines.push(
     `Constraints: energy is ${ENERGY_LABEL[input.energy]}, they have ${TIME_LABEL[input.time]}, ` +
       `they want to do this ${SOCIAL_LABEL[input.social]}, ${PLACE_LABEL[input.setting]}, ` +
@@ -97,9 +113,17 @@ function buildPrompt(
     );
   }
   if (nearbyName) {
+    lines.push(`They're roughly in ${nearbyName}.`);
+  }
+  if (nearbyVenues.length > 0) {
+    const list = nearbyVenues.slice(0, 8).map((v) => `${v.name} (${v.kind})`).join(', ');
     lines.push(
-      `There's a real nearby place called "${nearbyName}" you may reference naturally in ` +
-        `at most one suggestion if it genuinely fits — never invent a place name yourself.`
+      `Real, actually-nearby places you can name specifically: ${list}. For any outdoor, ` +
+        `errand-like, or "go somewhere" suggestion, name one of these real places by name ` +
+        `instead of being vague ("take a walk" is weak — "walk to ${nearbyVenues[0].name}" is ` +
+        `concrete and genuinely useful). Never invent a place name that isn't in this list. ` +
+        `Suggestions that are inherently about someone's own home (tidying, resting, a small ` +
+        `private task) don't need a place name — don't force one in.`
     );
   }
   if (patternHint) {
@@ -123,6 +147,12 @@ function buildPrompt(
   lines.push(
     `Each suggestion needs a genuine, specific "why this helps right now" line that speaks ` +
       `directly to feeling ${input.mood} — never generic self-help language.`
+  );
+  lines.push(
+    `Be concrete everywhere, not just about place: "reorganize one drawer you pass every day" ` +
+      `beats "clean a drawer" (which one?); "text the friend you last texted" beats "reach out ` +
+      `to someone." Vague suggestions that hand the hard decision back to the person defeat ` +
+      `the point of this app.`
   );
   lines.push(
     `Vary the category across suggestions where you can. Valid categories: ` +
@@ -235,12 +265,13 @@ export async function generateAiPlan(
   config: AiPlanConfig,
   nearbyName: string | null = null,
   patternHint: string | null = null,
-  avoidTitles: string[] = []
+  avoidTitles: string[] = [],
+  nearbyVenues: NearbyVenueName[] = []
 ): Promise<Activity[] | null> {
   if (!config.apiKey || !config.apiKey.trim()) return null;
   const provider = config.provider ?? 'anthropic';
   const count = planCount(input.time);
-  const prompt = buildPrompt(input, count, nearbyName, patternHint, avoidTitles);
+  const prompt = buildPrompt(input, count, nearbyName, patternHint, avoidTitles, nearbyVenues);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_TIMEOUT);

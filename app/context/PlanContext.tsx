@@ -82,6 +82,11 @@ export interface PlanCard {
 export interface SavedEntry {
   activity: Activity;
   mood: MoodId;
+  /** When this was saved — powers the completion check-in (lib/completionCheck.ts),
+   * which needs to know it's been long enough that the person plausibly had a
+   * chance to actually do it. Optional only because entries saved before this
+   * field existed won't have it; those are simply never eligible for a check-in. */
+  savedAt?: number;
 }
 
 const SAVED_KEY = 'whatnow.saved.v2';
@@ -111,6 +116,10 @@ interface PlanContextValue {
   setting: Place;
   budget: Budget;
   withKids: boolean;
+  // Set only by the mood grid's "Other" tile — the raw text someone typed
+  // instead of picking a listed mood. See lib/moodMatch.ts for how it still
+  // gets bucketed into a real MoodId for the engine/feedback log underneath.
+  freeformDescription: string;
   setMood: (m: MoodId) => void;
   setEnergy: (e: Energy) => void;
   setTime: (t: TimeVal) => void;
@@ -118,6 +127,7 @@ interface PlanContextValue {
   setSetting: (p: Place) => void;
   setBudget: (b: Budget) => void;
   setWithKids: (v: boolean) => void;
+  setFreeformDescription: (v: string) => void;
   // derived
   weather: WeatherState | null;
   nearby: NearbyPlace | null;
@@ -172,6 +182,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [setting, setSetting] = useState<Place>('either');
   const [budget, setBudget] = useState<Budget>('cheap');
   const [withKids, setWithKids] = useState<boolean>(false);
+  const [freeformDescription, setFreeformDescription] = useState<string>('');
 
   const [weather, setWeather] = useState<WeatherState | null>(null);
   const [nearby, setNearby] = useState<NearbyPlace | null>(null);
@@ -343,8 +354,18 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   const planInput: PlanInput | null = useMemo(() => {
     if (!mood) return null;
-    return { mood, energy, time, social, setting, budget, weather, withKids };
-  }, [mood, energy, time, social, setting, budget, weather, withKids]);
+    return {
+      mood,
+      energy,
+      time,
+      social,
+      setting,
+      budget,
+      weather,
+      withKids,
+      freeform: freeformDescription || undefined,
+    };
+  }, [mood, energy, time, social, setting, budget, weather, withKids, freeformDescription]);
 
   /** Bounded wait: if a location request just kicked off, give it a moment
    * to land so the plan can use it — but never block plan generation for
@@ -372,6 +393,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         budget,
         weather: weatherRef.current,
         withKids,
+        freeform: freeformDescription || undefined,
       };
       setPlanLoading(true);
       try {
@@ -391,7 +413,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
             { apiKey: aiApiKey },
             nearbyRef.current?.placeName ?? null,
             patternHint,
-            avoidTitles
+            avoidTitles,
+            nearbyRef.current?.venues ?? []
           );
           if (aiActivities && aiActivities.length >= 2) {
             cards = aiActivities.map((activity) => ({ activity, index: null, mood: input.mood }));
@@ -422,7 +445,20 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         setPlanLoading(false);
       }
     },
-    [mood, energy, time, social, setting, budget, withKids, aiEnabled, aiApiKey, refreshUsageCounts, lastPlan]
+    [
+      mood,
+      energy,
+      time,
+      social,
+      setting,
+      budget,
+      withKids,
+      freeformDescription,
+      aiEnabled,
+      aiApiKey,
+      refreshUsageCounts,
+      lastPlan,
+    ]
   );
 
   const reshuffle = useCallback(async (): Promise<PlanCard[]> => {
@@ -549,7 +585,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         const exists = prev.some((s) => s.activity.id === activity.id);
         const next = exists
           ? prev.filter((s) => s.activity.id !== activity.id)
-          : [...prev, { activity, mood: mood ?? activity.moods[0] }];
+          : [...prev, { activity, mood: mood ?? activity.moods[0], savedAt: Date.now() }];
         persistSaved(next);
         return next;
       });
@@ -585,6 +621,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setSetting('either');
     setBudget('cheap');
     setWithKids(false);
+    setFreeformDescription('');
     setLastPlan([]);
     setPlanSource(null);
     setNearbySearchResults(null);
@@ -598,6 +635,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setting,
     budget,
     withKids,
+    freeformDescription,
     setMood,
     setEnergy,
     setTime,
@@ -605,6 +643,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setSetting,
     setBudget,
     setWithKids,
+    setFreeformDescription,
     weather,
     nearby,
     locationStatus,

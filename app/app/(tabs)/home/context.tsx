@@ -38,6 +38,7 @@ export default function ContextScreen() {
     locationStatus,
     requestLocation,
     makePlan,
+    freeformDescription,
   } = usePlan();
 
   const moodMeta = MOODS.find((m) => m.id === mood);
@@ -70,7 +71,14 @@ export default function ContextScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        {moodMeta ? (
+        {freeformDescription ? (
+          <View style={[styles.moodPill, { backgroundColor: colors.coralTint, borderColor: colors.coral }]}>
+            <Icon name="other" size={16} color={colors.coralDeep} strokeWidth={1.9} />
+            <Text style={[styles.moodPillText, { color: colors.coralDeep }]} numberOfLines={1}>
+              "{freeformDescription}"
+            </Text>
+          </View>
+        ) : moodMeta ? (
           <View
             style={[
               styles.moodPill,
