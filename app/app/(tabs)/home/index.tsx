@@ -17,6 +17,7 @@ import { SavedEntry, usePlan } from '../../../context/PlanContext';
 import { dismissCompletionCheck, getPendingCompletionCheck } from '../../../lib/completionCheck';
 import { recordExplicitFeedback } from '../../../lib/feedback';
 import { matchMoodFromText } from '../../../lib/moodMatch';
+import { checkForCrisisLanguage } from '../../../lib/safetyCheck';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 
 export default function MoodScreen() {
@@ -26,6 +27,7 @@ export default function MoodScreen() {
   const [otherOpen, setOtherOpen] = React.useState(!!freeformDescription);
   const [draft, setDraft] = React.useState(freeformDescription);
   const [checkIn, setCheckIn] = React.useState<SavedEntry | null>(null);
+  const [showCrisisNotice, setShowCrisisNotice] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -57,14 +59,25 @@ export default function MoodScreen() {
     }
   };
 
-  const submitOther = () => {
-    const text = draft.trim();
-    if (!text) return;
+  const proceedWithFreeform = (text: string) => {
     const matched = matchMoodFromText(text);
     setMood(matched);
     setFreeformDescription(text);
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     router.push('/home/context');
+  };
+
+  const submitOther = () => {
+    const text = draft.trim();
+    if (!text) return;
+    // A caring pause, not a gate: if this reads like a crisis, say something
+    // human first, but never trap the person — "see ideas anyway" is always
+    // right there.
+    if (checkForCrisisLanguage(text)) {
+      setShowCrisisNotice(true);
+      return;
+    }
+    proceedWithFreeform(text);
   };
 
   const selectedWord =
@@ -196,6 +209,31 @@ export default function MoodScreen() {
             </Text>
           </View>
         ) : null}
+
+        {showCrisisNotice ? (
+          <View style={styles.crisisCard}>
+            <Text style={styles.crisisH}>Before anything else</Text>
+            <Text style={styles.crisisBody}>
+              That sounds heavy. If you're in immediate danger, please contact your local
+              emergency number. In the US, the 988 Suicide & Crisis Lifeline is free,
+              confidential, and reachable 24/7 by call or text — wherever you are, reaching out
+              to someone you trust is worth doing.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setShowCrisisNotice(false);
+                proceedWithFreeform(draft.trim());
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.crisisBtn, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.crisisBtnText}>See activity ideas anyway</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowCrisisNotice(false)} accessibilityRole="button">
+              <Text style={styles.crisisDismiss}>Not now</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
@@ -320,6 +358,25 @@ const styles = StyleSheet.create({
   },
   otherSubmitText: { fontSize: 14, ...font.bold, color: colors.white },
   otherHint: { fontSize: 12, color: colors.inkFaint, ...font.regular, lineHeight: 17 },
+  crisisCard: {
+    marginTop: 10,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.sage,
+    padding: 16,
+  },
+  crisisH: { fontSize: 14.5, ...font.bold, color: colors.ink, marginBottom: 6 },
+  crisisBody: { fontSize: 13.5, color: colors.inkSoft, ...font.regular, lineHeight: 20, marginBottom: 14 },
+  crisisBtn: {
+    backgroundColor: colors.sage,
+    borderRadius: radius.pill,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  crisisBtnText: { fontSize: 13.5, ...font.semibold, color: colors.white },
+  crisisDismiss: { fontSize: 12.5, ...font.medium, color: colors.inkFaint, textAlign: 'center' },
   checkInCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
