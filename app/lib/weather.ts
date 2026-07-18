@@ -84,5 +84,13 @@ export function weatherNote(w: WeatherState): string {
     : w.good
     ? 'Good conditions to get outside.'
     : 'Weather-neutral picks below.';
-  return `${w.emo}  It's ${w.temp}°C & ${w.desc} — ${lean}`;
+  return `It's ${w.temp}°C & ${w.desc} — ${lean}`;
+}
+
+/** Which of the three weather icon marks best fits this reading, for
+ * callers that want to show a glyph next to weatherNote()'s text. */
+export function weatherIconName(w: WeatherState): 'weather-good' | 'weather-neutral' | 'weather-bad' {
+  if (w.bad) return 'weather-bad';
+  if (w.good) return 'weather-good';
+  return 'weather-neutral';
 }

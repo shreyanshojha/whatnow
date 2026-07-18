@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../components/Icon';
 import { usePlan } from '../../context/PlanContext';
 import { CATS, COST_LABEL, TIME_LABEL } from '../../data/activities';
 import { colors, font, fontDisplay, radius, shadow } from '../../lib/theme';
@@ -14,7 +15,7 @@ export default function SavedScreen() {
   if (saved.length === 0) {
     return (
       <View style={styles.emptyRoot}>
-        <Text style={styles.emptyEmo}>💛</Text>
+        <Icon name="heart-outline" size={44} color={colors.inkFaint} strokeWidth={1.4} />
         <Text style={styles.emptyH}>Nothing saved yet</Text>
         <Text style={styles.emptyP}>
           Tap the heart on any activity to tuck it away here for later. Your saves stay on
@@ -43,7 +44,9 @@ export default function SavedScreen() {
         const cat = CATS[a.cat];
         return (
           <View key={a.id} style={[styles.item, { borderLeftColor: cat.color }]}>
-            <Text style={styles.itemEmo}>{cat.emo}</Text>
+            <View style={[styles.itemIconWrap, { backgroundColor: cat.tint }]}>
+              <Icon name={a.cat} size={17} color={cat.color} strokeWidth={1.8} />
+            </View>
             <View style={styles.itemBody}>
               <Text style={styles.itemTitle}>{a.t}</Text>
               <Text style={styles.itemMeta}>
@@ -88,7 +91,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     ...shadow.soft,
   },
-  itemEmo: { fontSize: 22 },
+  itemIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   itemBody: { flex: 1 },
   itemTitle: { fontSize: 15.5, ...font.semibold, color: colors.ink, lineHeight: 20 },
   itemMeta: { fontSize: 12.5, color: colors.inkFaint, marginTop: 2 },

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../components/Icon';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
@@ -143,9 +144,7 @@ export default function AboutScreen() {
           hitSlop={6}
           style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.keySavedText}>
-            {historyCleared ? 'Cleared ✓' : 'Clear location history'}
-          </Text>
+          <FlashLabel flashed={historyCleared} flashedText="Cleared" idleText="Clear location history" />
         </Pressable>
         <Pressable
           onPress={onClearFeedback}
@@ -154,9 +153,7 @@ export default function AboutScreen() {
           hitSlop={6}
           style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.keySavedText}>
-            {learningCleared ? 'Cleared ✓' : 'Clear learning history'}
-          </Text>
+          <FlashLabel flashed={learningCleared} flashedText="Cleared" idleText="Clear learning history" />
         </Pressable>
       </View>
 
@@ -199,7 +196,7 @@ export default function AboutScreen() {
             hitSlop={6}
             style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.keySavedText}>{savedFlash ? 'Saved ✓' : 'Save key'}</Text>
+            <FlashLabel flashed={savedFlash} flashedText="Saved" idleText="Save key" />
           </Pressable>
           {aiEnabled && aiApiKey ? (
             <Text style={styles.usageText}>
@@ -241,7 +238,7 @@ export default function AboutScreen() {
           hitSlop={6}
           style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.keySavedText}>{eventsSavedFlash ? 'Saved ✓' : 'Save key'}</Text>
+          <FlashLabel flashed={eventsSavedFlash} flashedText="Saved" idleText="Save key" />
         </Pressable>
       </View>
 
@@ -257,6 +254,23 @@ export default function AboutScreen() {
       </Text>
       <Text style={styles.version}>Version 1.0.0</Text>
     </ScrollView>
+  );
+}
+
+function FlashLabel({
+  flashed,
+  flashedText,
+  idleText,
+}: {
+  flashed: boolean;
+  flashedText: string;
+  idleText: string;
+}) {
+  return (
+    <View style={styles.flashRow}>
+      {flashed ? <Icon name="check" size={14} color={colors.coralDeep} strokeWidth={2.2} /> : null}
+      <Text style={styles.keySavedText}>{flashed ? flashedText : idleText}</Text>
+    </View>
   );
 }
 
@@ -319,6 +333,7 @@ const styles = StyleSheet.create({
     ...font.semibold,
     color: colors.coralDeep,
   },
+  flashRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   keyFooterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

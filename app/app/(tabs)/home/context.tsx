@@ -9,11 +9,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../../components/Icon';
 import { Segmented } from '../../../components/Segmented';
 import { usePlan } from '../../../context/PlanContext';
 import { MOODS } from '../../../data/activities';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
-import { weatherNote } from '../../../lib/weather';
+import { weatherIconName, weatherNote } from '../../../lib/weather';
 
 export default function ContextScreen() {
   const router = useRouter();
@@ -74,7 +75,7 @@ export default function ContextScreen() {
               { backgroundColor: moodMeta.tint, borderColor: moodMeta.color },
             ]}
           >
-            <Text style={styles.moodPillEmo}>{moodMeta.emo}</Text>
+            <Icon name={moodMeta.id} size={16} color={moodMeta.color} strokeWidth={1.9} />
             <Text style={[styles.moodPillText, { color: moodMeta.color }]}>
               Feeling {moodMeta.word}
             </Text>
@@ -91,9 +92,9 @@ export default function ContextScreen() {
           value={energy}
           onChange={setEnergy}
           options={[
-            { val: 'low', label: 'Low', ic: '🔅' },
-            { val: 'medium', label: 'Medium', ic: '🔆' },
-            { val: 'high', label: 'High', ic: '⚡' },
+            { val: 'low', label: 'Low', ic: 'energy-low' },
+            { val: 'medium', label: 'Medium', ic: 'energy-medium' },
+            { val: 'high', label: 'High', ic: 'energy-high' },
           ]}
         />
         <Segmented
@@ -101,9 +102,9 @@ export default function ContextScreen() {
           value={time}
           onChange={setTime}
           options={[
-            { val: 15, label: '15 min', ic: '⏱️', aria: '15 minutes' },
-            { val: 60, label: '~1 hour', ic: '🕐', aria: 'About one hour' },
-            { val: 240, label: 'Half-day', ic: '🌤️', aria: 'Half a day' },
+            { val: 15, label: '15 min', ic: 'clock', aria: '15 minutes' },
+            { val: 60, label: '~1 hour', ic: 'clock', aria: 'About one hour' },
+            { val: 240, label: 'Half-day', ic: 'clock', aria: 'Half a day' },
           ]}
         />
         <Segmented
@@ -111,9 +112,9 @@ export default function ContextScreen() {
           value={social}
           onChange={setSocial}
           options={[
-            { val: 'solo', label: 'Solo', ic: '🧍' },
-            { val: 'someone', label: 'Someone', ic: '👫', aria: 'With someone' },
-            { val: 'group', label: 'Group', ic: '👥' },
+            { val: 'solo', label: 'Solo', ic: 'social-solo' },
+            { val: 'someone', label: 'Someone', ic: 'social-someone', aria: 'With someone' },
+            { val: 'group', label: 'Group', ic: 'social-group' },
           ]}
         />
         <Segmented
@@ -121,9 +122,9 @@ export default function ContextScreen() {
           value={setting}
           onChange={setSetting}
           options={[
-            { val: 'indoor', label: 'Indoor', ic: '🏠' },
-            { val: 'outdoor', label: 'Outdoor', ic: '🌳' },
-            { val: 'either', label: 'Either', ic: '🔀' },
+            { val: 'indoor', label: 'Indoor', ic: 'indoor' },
+            { val: 'outdoor', label: 'Outdoor', ic: 'outdoor' },
+            { val: 'either', label: 'Either', ic: 'either' },
           ]}
         />
         <Segmented
@@ -131,16 +132,24 @@ export default function ContextScreen() {
           value={budget}
           onChange={setBudget}
           options={[
-            { val: 'free', label: 'Free', ic: '🆓' },
-            { val: 'cheap', label: 'Cheap', ic: '🪙' },
-            { val: 'treat', label: 'Treat', ic: '💛' },
+            { val: 'free', label: "Won't spend", ic: 'budget-free' },
+            { val: 'cheap', label: 'A little', ic: 'budget-cheap' },
+            { val: 'treat', label: 'Treat myself', ic: 'budget-treat' },
           ]}
         />
 
         <View style={styles.weatherCard}>
-          <Text style={styles.weatherBody}>{locationBody}</Text>
+          <View style={styles.weatherRow}>
+            {weather ? (
+              <Icon name={weatherIconName(weather)} size={17} color={colors.inkSoft} strokeWidth={1.7} />
+            ) : null}
+            <Text style={styles.weatherBody}>{locationBody}</Text>
+          </View>
           {nearby?.placeName ? (
-            <Text style={styles.weatherPlace}>📍 {nearby.placeName}</Text>
+            <View style={[styles.weatherRow, { marginTop: 8 }]}>
+              <Icon name="pin" size={14} color={colors.ink} strokeWidth={1.8} />
+              <Text style={styles.weatherPlace}>{nearby.placeName}</Text>
+            </View>
           ) : null}
           {!weather && locationStatus !== 'denied' ? (
             <Pressable
@@ -209,8 +218,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     ...shadow.soft,
   },
-  weatherBody: { fontSize: 14.5, color: colors.inkSoft, lineHeight: 21 },
-  weatherPlace: { fontSize: 13.5, color: colors.ink, ...font.medium, marginTop: 8 },
+  weatherRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  weatherBody: { flex: 1, fontSize: 14.5, color: colors.inkSoft, lineHeight: 21 },
+  weatherPlace: { fontSize: 13.5, color: colors.ink, ...font.medium },
   weatherBtn: {
     marginTop: 12,
     alignSelf: 'flex-start',

@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
+import { Icon } from '../../components/Icon';
 import { colors, font } from '../../lib/theme';
 
 /** Persistent bottom tabs: Home (the mood → context → plan flow), Saved,
@@ -26,7 +26,7 @@ export default function TabsLayout() {
         options={{
           headerShown: false,
           title: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🧭</Text>,
+          tabBarIcon: ({ color }) => <Icon name="compass" size={22} color={color as string} strokeWidth={1.8} />,
         }}
       />
       <Tabs.Screen
@@ -34,7 +34,7 @@ export default function TabsLayout() {
         options={{
           title: 'Saved for later',
           tabBarLabel: 'Saved',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💛</Text>,
+          tabBarIcon: ({ color }) => <Icon name="heart-filled" size={20} color={color as string} />,
         }}
       />
       <Tabs.Screen
@@ -42,7 +42,7 @@ export default function TabsLayout() {
         options={{
           title: 'About WhatNow',
           tabBarLabel: 'About',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>ℹ️</Text>,
+          tabBarIcon: ({ color }) => <Icon name="info" size={22} color={color as string} strokeWidth={1.8} />,
         }}
       />
     </Tabs>

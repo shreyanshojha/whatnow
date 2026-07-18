@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../../components/Icon';
 import { MOODS, MoodId } from '../../../data/activities';
 import { usePlan } from '../../../context/PlanContext';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
@@ -63,7 +64,12 @@ export default function MoodScreen() {
                   pressed && styles.moodPressed,
                 ]}
               >
-                <Text style={styles.moodEmo}>{m.emo}</Text>
+                <Icon
+                  name={m.id}
+                  size={30}
+                  color={active ? m.color : colors.inkFaint}
+                  strokeWidth={1.6}
+                />
                 <Text style={[styles.moodWord, active && { color: m.color }]}>
                   {m.word}
                 </Text>

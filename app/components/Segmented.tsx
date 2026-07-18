@@ -1,11 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon, IconName } from './Icon';
 import { colors, radius, font } from '../lib/theme';
 
 export interface SegOption<T> {
   val: T;
   label: string;
-  ic?: string;
+  ic?: IconName;
   aria?: string;
 }
 
@@ -41,7 +42,14 @@ export function Segmented<T extends string | number>({
                 pressed && styles.segPressed,
               ]}
             >
-              {o.ic ? <Text style={styles.ic}>{o.ic}</Text> : null}
+              {o.ic ? (
+                <Icon
+                  name={o.ic}
+                  size={16}
+                  color={active ? colors.coralDeep : colors.inkFaint}
+                  strokeWidth={1.9}
+                />
+              ) : null}
               <Text style={[styles.segText, active && styles.segTextActive]}>
                 {o.label}
               </Text>

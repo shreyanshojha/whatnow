@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityCard } from '../../../components/ActivityCard';
+import { Icon, IconName } from '../../../components/Icon';
 import { usePlan } from '../../../context/PlanContext';
 import {
   ENERGY_LABEL,
@@ -23,7 +24,7 @@ import {
 } from '../../../data/activities';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 import { useReducedMotion } from '../../../lib/useReducedMotion';
-import { weatherNote } from '../../../lib/weather';
+import { weatherIconName, weatherNote } from '../../../lib/weather';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -66,9 +67,10 @@ export default function PlanScreen() {
       showsVerticalScrollIndicator={false}
     >
       {moodMeta ? (
-        <Text style={styles.h1}>
-          Feeling {moodMeta.emo} {moodMeta.word}? Here's your plan.
-        </Text>
+        <View style={styles.h1Row}>
+          <Icon name={moodMeta.id} size={26} color={moodMeta.color} strokeWidth={1.7} />
+          <Text style={styles.h1}>Feeling {moodMeta.word}? Here's your plan.</Text>
+        </View>
       ) : (
         <Text style={styles.h1}>Here's your plan.</Text>
       )}
@@ -83,11 +85,17 @@ export default function PlanScreen() {
 
       {planSource === 'ai' && !planLoading ? (
         <View style={styles.aiBadge}>
-          <Text style={styles.aiBadgeText}>✨ Composed fresh for you by AI</Text>
+          <Icon name="inspired" size={13} color={colors.plum} strokeWidth={1.8} />
+          <Text style={styles.aiBadgeText}>Composed fresh for you by AI</Text>
         </View>
       ) : null}
 
-      {weather ? <Text style={styles.weather}>{weatherNote(weather)}</Text> : null}
+      {weather ? (
+        <View style={styles.weather}>
+          <Icon name={weatherIconName(weather)} size={16} color={colors.ink} strokeWidth={1.7} />
+          <Text style={styles.weatherText}>{weatherNote(weather)}</Text>
+        </View>
+      ) : null}
 
       {planLoading ? (
         <View style={styles.loading}>
@@ -96,7 +104,7 @@ export default function PlanScreen() {
         </View>
       ) : lastPlan.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyEmo}>🧭</Text>
+          <Icon name="compass" size={40} color={colors.inkFaint} strokeWidth={1.4} />
           <Text style={styles.emptyH}>That combination is a tight fit.</Text>
           <Text style={styles.emptyP}>
             Nothing matched every constraint at once. Try widening one thing — a bit more
@@ -161,16 +169,16 @@ export default function PlanScreen() {
   );
 }
 
-const VENUE_ICON: Record<string, string> = {
-  park: '🌳',
-  cafe: '☕',
-  library: '📚',
-  gym: '🏋️',
-  restaurant: '🍽️',
-  bar: '🍸',
-  museum: '🖼️',
-  bookstore: '📖',
-  cinema: '🎬',
+const VENUE_ICON: Record<string, IconName> = {
+  park: 'venue-park',
+  cafe: 'venue-cafe',
+  library: 'venue-library',
+  gym: 'venue-gym',
+  restaurant: 'venue-restaurant',
+  bar: 'venue-bar',
+  museum: 'venue-museum',
+  bookstore: 'venue-bookstore',
+  cinema: 'venue-cinema',
 };
 
 function formatEventDate(localDate: string | null): string {
@@ -199,7 +207,9 @@ function NearbyRightNow({
 
       {venues.slice(0, 5).map((v) => (
         <View key={v.name} style={styles.nearbyRow}>
-          <Text style={styles.nearbyIcon}>{VENUE_ICON[v.kind] ?? '📍'}</Text>
+          <View style={styles.nearbyIconWrap}>
+            <Icon name={VENUE_ICON[v.kind] ?? 'pin'} size={17} color={colors.inkSoft} strokeWidth={1.7} />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.nearbyName}>{v.name}</Text>
             <Text style={styles.nearbyMeta}>
@@ -224,7 +234,9 @@ function NearbyRightNow({
               if (e.url) Linking.openURL(e.url).catch(() => {});
             }}
           >
-            <Text style={styles.nearbyIcon}>🎟️</Text>
+            <View style={styles.nearbyIconWrap}>
+              <Icon name="ticket" size={17} color={colors.inkSoft} strokeWidth={1.7} />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.nearbyName}>{e.name}</Text>
               <Text style={styles.nearbyMeta}>
@@ -250,17 +262,26 @@ function NearbyRightNow({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 6 },
+  h1Row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   h1: {
+    flexShrink: 1,
     fontSize: 26,
     ...fontDisplay.bold,
     color: colors.ink,
     letterSpacing: -0.4,
     lineHeight: 32,
-    marginBottom: 8,
   },
   sum: { fontSize: 15, color: colors.inkSoft, lineHeight: 22, marginBottom: 8 },
   b: { ...font.semibold, color: colors.ink },
   aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     alignSelf: 'flex-start',
     backgroundColor: '#F3ECF7',
     borderRadius: radius.pill,
@@ -292,7 +313,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 10,
   },
-  nearbyIcon: { fontSize: 18, width: 22, textAlign: 'center' },
+  nearbyIconWrap: { width: 22, alignItems: 'center' },
   nearbyName: { fontSize: 14.5, ...font.semibold, color: colors.ink },
   nearbyMeta: { fontSize: 12.5, color: colors.inkFaint, marginTop: 1 },
   nearbyAttribution: {
@@ -302,16 +323,16 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   weather: {
-    fontSize: 14,
-    color: colors.ink,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: colors.bg2,
     borderRadius: radius.md,
     paddingVertical: 10,
     paddingHorizontal: 13,
-    overflow: 'hidden',
     marginBottom: 18,
-    lineHeight: 20,
   },
+  weatherText: { flex: 1, fontSize: 14, color: colors.ink, lineHeight: 20 },
   cards: { marginTop: 6 },
   tools: { gap: 10, marginTop: 4, marginBottom: 8 },
   reshuffle: {

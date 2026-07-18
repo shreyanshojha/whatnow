@@ -12,6 +12,18 @@ import {
 import { whyFor } from '../lib/plan';
 import { NearbyPlace } from '../lib/places';
 import { colors, font, fontDisplay, radius, shadow } from '../lib/theme';
+import { Icon, IconName } from './Icon';
+
+const PLACE_ICON: Record<Activity['place'], IconName> = {
+  outdoor: 'outdoor',
+  indoor: 'indoor',
+  either: 'either',
+};
+const COST_ICON: Record<Activity['cost'], IconName> = {
+  free: 'budget-free',
+  cheap: 'budget-cheap',
+  treat: 'budget-treat',
+};
 
 interface Props {
   activity: Activity;
@@ -59,8 +71,6 @@ export function ActivityCard({
       useNativeDriver: true,
     }).start();
   }, [anim, order, reducedMotion]);
-
-  const placeIcon = a.place === 'outdoor' ? '🌳' : a.place === 'indoor' ? '🏠' : '🔀';
 
   // Saving is the app's most-repeated action — give it real delight: a
   // success haptic and a quick bounce, not just an instant icon swap.
@@ -110,7 +120,7 @@ export function ActivityCard({
     >
       <View style={styles.topRow}>
         <View style={[styles.catTag, { backgroundColor: cat.tint }]}>
-          <Text style={styles.catEmo}>{cat.emo}</Text>
+          <Icon name={a.cat} size={14} color={cat.color} strokeWidth={1.9} />
           <Text style={[styles.catLabel, { color: cat.color }]}>{cat.label}</Text>
         </View>
         <Pressable
@@ -121,15 +131,14 @@ export function ActivityCard({
           accessibilityLabel={saved ? 'Remove from saved' : 'Save for later'}
           style={styles.saveBtn}
         >
-          <Animated.Text
-            style={[
-              styles.heart,
-              saved && { color: colors.coral },
-              { transform: [{ scale: heartScale }] },
-            ]}
-          >
-            {saved ? '♥' : '♡'}
-          </Animated.Text>
+          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+            <Icon
+              name={saved ? 'heart-filled' : 'heart-outline'}
+              size={24}
+              color={saved ? colors.coral : colors.inkFaint}
+              strokeWidth={1.8}
+            />
+          </Animated.View>
         </Pressable>
       </View>
 
@@ -144,23 +153,27 @@ export function ActivityCard({
       </View>
 
       {showTip && amenity ? (
-        <Text style={styles.tip}>
-          📍 Near you: <Text style={styles.tipStrong}>{amenity.name}</Text>
-        </Text>
+        <View style={styles.tipRow}>
+          <Icon name="pin" size={13} color={colors.inkSoft} strokeWidth={1.9} />
+          <Text style={styles.tip}>
+            Near you: <Text style={styles.tipStrong}>{amenity.name}</Text>
+          </Text>
+        </View>
       ) : null}
 
       <View style={styles.meta}>
-        <Chip>{`⏱ ${TIME_LABEL[a.time]}`}</Chip>
-        <Chip>{`${placeIcon} ${PLACE_LABEL[a.place]}`}</Chip>
-        <Chip>{COST_LABEL[a.cost]}</Chip>
+        <Chip icon="clock">{TIME_LABEL[a.time]}</Chip>
+        <Chip icon={PLACE_ICON[a.place]}>{PLACE_LABEL[a.place]}</Chip>
+        <Chip icon={COST_ICON[a.cost]}>{COST_LABEL[a.cost]}</Chip>
       </View>
     </Animated.View>
   );
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
+function Chip({ children, icon }: { children: React.ReactNode; icon: IconName }) {
   return (
     <View style={styles.chip}>
+      <Icon name={icon} size={13} color={colors.inkSoft} strokeWidth={1.9} />
       <Text style={styles.chipText}>{children}</Text>
     </View>
   );
@@ -210,10 +223,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   whyText: { fontSize: 14.5, color: colors.ink, lineHeight: 20 },
-  tip: { fontSize: 13.5, color: colors.inkSoft, marginBottom: 12 },
+  tipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  tip: { flex: 1, fontSize: 13.5, color: colors.inkSoft },
   tipStrong: { ...font.semibold, color: colors.ink },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: colors.bg,
     borderRadius: radius.pill,
     paddingVertical: 6,
