@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '../context/AuthContext';
 import { PlanProvider } from '../context/PlanContext';
 
 // Keep the splash screen up until the custom typeface is ready — Fraunces
@@ -50,12 +51,14 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <PlanProvider>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </PlanProvider>
+      <AuthProvider>
+        <PlanProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </PlanProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

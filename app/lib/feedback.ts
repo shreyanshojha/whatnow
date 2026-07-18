@@ -27,6 +27,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodId } from '../data/activities';
+import { syncFeedbackEvent } from './sync';
 
 export type FeedbackEvent = 'shown' | 'accepted' | 'rejected' | 'thumbsUp' | 'thumbsDown';
 
@@ -74,11 +75,15 @@ export async function recordShown(ids: string[], mood: MoodId): Promise<void> {
 export async function recordRejected(ids: string[], mood: MoodId): Promise<void> {
   const at = Date.now();
   await appendRecords(ids.map((id) => ({ id, mood, event: 'rejected', at })));
+  // Fire-and-forget server mirror for a signed-in account — never awaited
+  // by the caller, never allowed to slow down or break the local log.
+  ids.forEach((id) => syncFeedbackEvent(id, mood, 'rejected').catch(() => {}));
 }
 
 /** Call when an activity is saved (a clear, deliberate positive signal). */
 export async function recordAccepted(id: string, mood: MoodId): Promise<void> {
   await appendRecords([{ id, mood, event: 'accepted', at: Date.now() }]);
+  syncFeedbackEvent(id, mood, 'accepted').catch(() => {});
 }
 
 /** Call when someone taps the explicit thumbs-up/down control on a card —
@@ -88,9 +93,9 @@ export async function recordExplicitFeedback(
   mood: MoodId,
   positive: boolean
 ): Promise<void> {
-  await appendRecords([
-    { id, mood, event: positive ? 'thumbsUp' : 'thumbsDown', at: Date.now() },
-  ]);
+  const event = positive ? 'thumbsUp' : 'thumbsDown';
+  await appendRecords([{ id, mood, event, at: Date.now() }]);
+  syncFeedbackEvent(id, mood, event).catch(() => {});
 }
 
 export async function clearFeedback(): Promise<void> {

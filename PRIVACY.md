@@ -1,25 +1,42 @@
 # WhatNow Privacy Policy
 
-*Last updated: July 2026*
+*Version: 2026-07-17-v1 · Last updated: July 17, 2026*
 
 WhatNow ("the app") is built by Shreyansh Ojha. This page explains, in plain language, what
-information the app touches and what happens to it. There are no user accounts, no logins,
-and no names collected anywhere in this app.
+information the app touches and what happens to it.
 
-## What WhatNow never collects
+## Accounts
 
-WhatNow doesn't ask for your name, email, phone number, or any account. There's nothing to
-sign up for and nothing tying any of the below to your identity.
+WhatNow uses real user accounts (email + password) so your saved activities and the app's
+sense of what you like can follow you to a new device instead of living only on one phone.
+Creating an account is how WhatNow personalizes its very first guess over time — that's the
+whole point of the app. You can still use most of WhatNow without signing in (see "Your
+choices" below), but some personalization only works once you have an account.
+
+Your account is protected by row-level security on our database: the technical rule is that
+your rows can only ever be read or written by you, authenticated as you — not by other
+users, and not by us browsing a general table. We (WhatNow) can see that an account exists
+and, if needed for support or legal reasons, its email address, saved activities, and
+feedback history — the same way any app operator can access data on its own servers. We
+don't sell your data, share it with advertisers, or use it for anything beyond running and
+improving WhatNow.
+
+You can permanently delete your account and all data tied to it at any time from the Account
+section of the About screen — this is a real, immediate deletion (see "Your choices").
 
 ## Your mood and plan preferences
 
-The mood, energy, time, social, indoor/outdoor, and budget choices you make stay on your
-device. They're used only to generate your plan in the moment and aren't sent anywhere.
+The mood, energy, time, social, indoor/outdoor, and budget choices you make are used to
+generate your plan in the moment. If you're signed in, each plan you generate is also logged
+to your account (mood, energy, time, social setting, and whether kids were with you) purely
+so WhatNow can learn what tends to fit — never sold, never shared, and deleted the moment you
+delete your account.
 
 ## Your saved activities
 
-Anything you save lives only in your device's local storage. It's never uploaded, backed
-up to a server, or visible to anyone else — including us.
+Anything you save lives on your device. If you're signed in, it's also mirrored to your
+account so it's there when you sign in on another device or reinstall the app. If you're not
+signed in, saved activities stay local to this device only, exactly as before.
 
 ## Location — what happens if you grant it
 
@@ -38,21 +55,21 @@ each time you do, two things happen:
 
 Separately, WhatNow keeps a small **on-device-only** pattern memory: a rolling log of
 roughly neighborhood-level locations (never exact GPS) paired with the mood you were feeling
-at the time. This never leaves your device, is never uploaded to any server WhatNow
-controls, and isn't tied to any account or identity beyond living on this one phone. It
-exists purely so the app can notice real patterns ("often near a park when feeling
+at the time. This never leaves your device and is never uploaded anywhere, signed in or not.
+It exists purely so the app can notice real patterns ("often near a park when feeling
 restless") and gently factor them into future plans. You can clear this at any time from the
 About screen, and deleting the app removes it permanently.
 
 ## Learning from what you choose
 
-WhatNow also keeps a small **on-device-only** log of which activities you've saved or
-reshuffled away, paired with the mood you were feeling. This is what lets the app get better
-at guessing what you'll actually want over time — nothing more than a lightweight tally per
-activity, never uploaded, never tied to an account. A single reshuffle never buries an
-activity forever, and a single save never crowds everything else out; it's a gentle nudge
-that builds up gradually. You can clear this at any time from the About screen, separately
-from your location pattern memory, without affecting your saved list.
+WhatNow keeps a log of which activities you've saved, reshuffled away, or given a direct
+thumbs-up/down, paired with the mood you were feeling — this is what lets the app get better
+at guessing what you'll actually want over time. This always lives on your device; if you're
+signed in, it's also mirrored to your account so that learning follows you to another device
+and — over time — powers better first guesses than an on-device-only log ever could. A
+single reshuffle never buries an activity forever, and a single save never crowds everything
+else out; it's a gentle nudge that builds up gradually. You can clear the on-device copy at
+any time from the About screen; deleting your account clears the server copy too.
 
 ## Optional AI planning
 
@@ -80,6 +97,8 @@ Same bring-your-own-key model: the key lives only in your device's secure keycha
 
 ## Your choices
 
+- Use WhatNow without an account — plans, saves, and on-device learning all still work; they
+  just stay local to this device rather than following you to another one.
 - Deny or skip location entirely — the app still works, using its built-in library of
   activities with no location-aware tuning.
 - Clear your on-device location pattern memory or your on-device learning history any time
@@ -87,8 +106,12 @@ Same bring-your-own-key model: the key lives only in your device's secure keycha
   activities.
 - Turn AI planning or live events off any time in the About screen — this also clears the
   saved key from your device.
+- Delete your account any time from the Account section of the About screen. This is
+  immediate and permanent: it removes your profile, saved activities, feedback history, and
+  plan history from our servers. It doesn't affect activities saved locally on your device.
 - Delete the app to remove everything stored locally, including your saved activities, your
-  location pattern memory, and your learning history.
+  location pattern memory, and your learning history (your account, if you have one, is
+  unaffected and can be signed back into from a reinstall).
 
 ## Changes to this policy
 

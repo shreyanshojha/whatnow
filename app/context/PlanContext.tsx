@@ -19,6 +19,7 @@ import React, {
   useState,
 } from 'react';
 import { ACTIVITIES, Activity, Energy, MoodId, Place, Social, TimeVal } from '../data/activities';
+import { useAuth } from './AuthContext';
 import { generateAiPlan } from '../lib/aiPlan';
 import { fetchNearbyEvents, LiveEvent } from '../lib/events';
 import {
@@ -32,6 +33,12 @@ import { addLocationVisit, clearLocationHistory, getPatternHint } from '../lib/l
 import { NearbyResult, searchNearby } from '../lib/nearbySearch';
 import { generatePlan, PlanInput, WeatherState } from '../lib/plan';
 import { NearbyPlace, fetchNearby } from '../lib/places';
+import {
+  fetchSyncedSavedActivities,
+  syncPlanEvent,
+  syncSaveActivity,
+  syncUnsaveActivity,
+} from '../lib/sync';
 import {
   loadAiApiKey,
   loadAiEnabled,
@@ -141,6 +148,7 @@ interface PlanContextValue {
 const Ctx = createContext<PlanContextValue | null>(null);
 
 export function PlanProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [mood, setMood] = useState<MoodId | null>(null);
   const [energy, setEnergy] = useState<Energy>('medium');
   const [time, setTime] = useState<TimeVal>(60);
@@ -265,6 +273,26 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // ---- Merge server-synced saved activities in on sign-in ----
+  // One-way merge, union by activity id — never removes a local save that
+  // isn't on the server yet (toggleSave's own sync call will push it up).
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const synced = await fetchSyncedSavedActivities();
+      if (!synced || synced.length === 0) return;
+      setSaved((prev) => {
+        const byId = new Map(prev.map((s) => [s.activity.id, s]));
+        for (const entry of synced) {
+          if (!byId.has(entry.activity.id)) byId.set(entry.activity.id, entry);
+        }
+        const merged = Array.from(byId.values());
+        persistSaved(merged);
+        return merged;
+      });
+    })();
+  }, [user, persistSaved]);
+
   const planInput: PlanInput | null = useMemo(() => {
     if (!mood) return null;
     return { mood, energy, time, social, setting, budget, weather, withKids };
@@ -300,6 +328,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       setPlanLoading(true);
       try {
         let cards: PlanCard[] | null = null;
+        let planSourceForSync: 'engine' | 'ai' = 'engine';
         const excludeIds = options.excludeIds;
 
         if (aiEnabled && aiApiKey && (await canUseAiPlanToday())) {
@@ -319,6 +348,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           if (aiActivities && aiActivities.length >= 2) {
             cards = aiActivities.map((activity) => ({ activity, index: null, mood: input.mood }));
             setPlanSource('ai');
+            planSourceForSync = 'ai';
             await recordAiPlanUse();
             refreshUsageCounts();
           }
@@ -338,6 +368,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           cards.map((c) => c.activity.id),
           input.mood
         ).catch(() => {});
+        syncPlanEvent(input, planSourceForSync).catch(() => {});
         return cards;
       } finally {
         setPlanLoading(false);
@@ -480,6 +511,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       const alreadySaved = savedRef.current.some((s) => s.activity.id === activity.id);
       if (!alreadySaved) {
         recordAccepted(activity.id, mood ?? activity.moods[0]).catch(() => {});
+        syncSaveActivity(activity, mood ?? activity.moods[0]).catch(() => {});
+      } else {
+        syncUnsaveActivity(activity.id).catch(() => {});
       }
     },
     [persistSaved, mood]

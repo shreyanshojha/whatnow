@@ -48,7 +48,14 @@ export type IconName =
   | 'venue-cinema'
   | 'thumb-up'
   | 'thumb-down'
-  | 'check';
+  | 'check'
+  | 'user'
+  | 'mail'
+  | 'lock'
+  | 'log-out'
+  | 'trash'
+  | 'arrow-right'
+  | 'shield';
 
 interface IconProps {
   name: IconName;
@@ -432,6 +439,62 @@ function draw(name: IconName, s: StrokeProps, color: string) {
           {...s}
           d="M7.2 13V4H4.3v9zm0 0 3 7.2a2 2 0 0 0 2-2v-3.2h5a2 2 0 0 0 2-2.3l-1.4-5.7A2 2 0 0 0 15.8 5.5H7.2"
         />
+      );
+
+    // ---------------- Account ----------------
+    case 'user':
+      return (
+        <>
+          <Circle {...s} cx="12" cy="8.6" r="3.3" />
+          <Path {...s} d="M6 20c0-3.6 2.7-6.1 6-6.1s6 2.5 6 6.1" />
+        </>
+      );
+    case 'mail':
+      return (
+        <>
+          <Rect {...s} x="3" y="5.5" width="18" height="13" rx="1.8" />
+          <Path {...s} d="M3.5 6.5 12 13l8.5-6.5" />
+        </>
+      );
+    case 'lock':
+      return (
+        <>
+          <Rect {...s} x="5" y="11" width="14" height="9.5" rx="1.8" />
+          <Path {...s} d="M7.5 11V8a4.5 4.5 0 0 1 9 0v3" />
+          <Circle cx="12" cy="15.3" r="1.3" fill={color} stroke="none" />
+        </>
+      );
+    case 'log-out':
+      return (
+        <>
+          <Path {...s} d="M9.5 4H5.5a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 5.5 20h4" />
+          <Line {...s} x1="10" y1="12" x2="20.5" y2="12" />
+          <Path {...s} d="M17 8.3 20.7 12l-3.7 3.7" />
+        </>
+      );
+    case 'trash':
+      return (
+        <>
+          <Path {...s} d="M4.5 7h15" />
+          <Path {...s} d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2" />
+          <Path {...s} d="M6.5 7 7.3 19a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7" />
+          <Line {...s} x1="10" y1="11" x2="10.3" y2="17" />
+          <Line {...s} x1="14" y1="11" x2="13.7" y2="17" />
+        </>
+      );
+    case 'arrow-right':
+      return (
+        <>
+          <Line {...s} x1="3.5" y1="12" x2="19.5" y2="12" />
+          <Path {...s} d="M14 6.5 20 12l-6 5.5" />
+        </>
+      );
+    case 'shield':
+      return (
+        <>
+          <Path {...s} d="M12 3.2 19.5 6v6.3c0 4.7-3.3 7.7-7.5 8.5-4.2-.8-7.5-3.8-7.5-8.5V6z" />
+          <Path {...s} d="M8.7 12.2l2.2 2.2 4.4-4.6" />
+        </>
       );
 
     // ---------------- Venue kinds (not aliased above) ----------------

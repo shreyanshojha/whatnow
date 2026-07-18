@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../components/Icon';
+import { PRIVACY_POLICY_VERSION, useAuth } from '../../context/AuthContext';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
@@ -114,6 +116,8 @@ export default function AboutScreen() {
         help right now.
       </Text>
 
+      <AccountCard />
+
       <View style={styles.card}>
         <Text style={styles.cardH}>How it works</Text>
         <Step n="1" t="Pick a mood" d={`One of ${MOODS.length} feelings, from restless to content.`} />
@@ -122,20 +126,26 @@ export default function AboutScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardH}>Privacy</Text>
+        <View style={styles.acctHeaderRow}>
+          <Icon name="shield" size={18} color={colors.ink} strokeWidth={1.7} />
+          <Text style={styles.cardH}>Privacy</Text>
+        </View>
         <Text style={styles.cardP}>
-          There's no account, no login, and nothing about you is ever sent to a WhatNow
-          server — there isn't one. Location is entirely optional. Each time you grant it,
-          WhatNow briefly checks the live weather (Open-Meteo) and nearby real places
+          Signing in is optional — everything below still works without an account, using
+          only this device. If you do sign in, your saved activities, feedback
+          (thumbs-up/down, accepts, rejects), and plan history are stored on WhatNow's
+          servers, protected so only your signed-in account can ever read or write them —
+          purely to make the app's guesses better over time and let your history follow you
+          to another device. We don't sell it, share it with advertisers, or use it for
+          anything beyond running WhatNow. Delete your account any time above to permanently
+          erase all of it. Location is entirely separate and optional: each time you grant
+          it, WhatNow briefly checks the live weather (Open-Meteo) and nearby real places
           (OpenStreetMap) to tailor that one plan — those coordinates go only to those
-          services, for that one lookup, and aren't kept afterward. Separately, WhatNow
-          keeps a small neighborhood-level pattern memory (never your exact GPS position) —
-          entirely on this device, never uploaded anywhere — so recommendations can notice
-          real patterns over time. WhatNow also quietly notices which activities you save
-          or reshuffle away, on this device only, so future plans lean toward what you
-          actually pick. You can wipe either memory below any time, and deleting the app
-          removes both for good. Your saved list also stays on this device. Deny location
-          and everything still works, just without the location-aware tuning.
+          services, for that one lookup. Separately, WhatNow keeps a small neighborhood-level
+          pattern memory (never your exact GPS position) entirely on this device, never
+          uploaded anywhere. You can wipe either memory below any time, and deleting the app
+          removes them for good. Deny location and everything still works, just without the
+          location-aware tuning. Full details in PRIVACY.md.
         </Text>
         <Pressable
           onPress={onClearHistory}
@@ -259,6 +269,224 @@ export default function AboutScreen() {
   );
 }
 
+function AccountCard() {
+  const { user, initializing, signUpWithEmail, signInWithEmail, signOut, deleteAccount } = useAuth();
+  const [mode, setMode] = React.useState<'signIn' | 'signUp'>('signUp');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [consented, setConsented] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [deleteArmed, setDeleteArmed] = React.useState(false);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!email.trim() || !password) {
+      setError('Enter an email and password.');
+      return;
+    }
+    if (mode === 'signUp' && !consented) {
+      setError('Please accept the privacy policy to create an account.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result =
+        mode === 'signUp'
+          ? await signUpWithEmail(email, password, PRIVACY_POLICY_VERSION)
+          : await signInWithEmail(email, password);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setPassword('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDeleteAccount = () => {
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      setTimeout(() => setDeleteArmed(false), 4000);
+      return;
+    }
+    setDeleteError(null);
+    setDeleteBusy(true);
+    deleteAccount()
+      .then((result) => {
+        if (result.error) setDeleteError(result.error);
+        setDeleteArmed(false);
+      })
+      .finally(() => setDeleteBusy(false));
+  };
+
+  if (initializing) {
+    return (
+      <View style={styles.card}>
+        <ActivityIndicator color={colors.coralDeep} />
+      </View>
+    );
+  }
+
+  if (user) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.acctHeaderRow}>
+          <Icon name="user" size={20} color={colors.ink} strokeWidth={1.8} />
+          <Text style={styles.cardH}>Account</Text>
+        </View>
+        <Text style={styles.cardP}>
+          Signed in as <Text style={font.semibold}>{user.email}</Text>. Your saved activities
+          and learning history follow you to any device you sign into.
+        </Text>
+        <Pressable
+          onPress={() => signOut()}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          hitSlop={6}
+          style={({ pressed }) => [styles.acctBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Icon name="log-out" size={16} color={colors.inkSoft} strokeWidth={1.9} />
+          <Text style={styles.acctBtnText}>Sign out</Text>
+        </Pressable>
+        <Pressable
+          onPress={onDeleteAccount}
+          disabled={deleteBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+          hitSlop={6}
+          style={({ pressed }) => [
+            styles.acctBtn,
+            deleteArmed && styles.acctBtnDanger,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          {deleteBusy ? (
+            <ActivityIndicator size="small" color={colors.inkSoft} />
+          ) : (
+            <Icon
+              name="trash"
+              size={16}
+              color={deleteArmed ? colors.white : colors.inkSoft}
+              strokeWidth={1.9}
+            />
+          )}
+          <Text style={[styles.acctBtnText, deleteArmed && { color: colors.white }]}>
+            {deleteArmed ? 'Tap again to permanently delete' : 'Delete account'}
+          </Text>
+        </Pressable>
+        {deleteError ? <Text style={styles.acctError}>{deleteError}</Text> : null}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.acctHeaderRow}>
+        <Icon name="user" size={20} color={colors.ink} strokeWidth={1.8} />
+        <Text style={styles.cardH}>Account</Text>
+      </View>
+      <Text style={styles.cardP}>
+        Create an account so your saved activities and what WhatNow learns about you follow
+        you across devices — this is what lets the app's first guess get better over time,
+        not just within one session.
+      </Text>
+
+      <View style={styles.acctModeRow}>
+        <Pressable
+          onPress={() => setMode('signUp')}
+          style={[styles.acctModeBtn, mode === 'signUp' && styles.acctModeBtnActive]}
+        >
+          <Text style={[styles.acctModeText, mode === 'signUp' && styles.acctModeTextActive]}>
+            Create account
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setMode('signIn')}
+          style={[styles.acctModeBtn, mode === 'signIn' && styles.acctModeBtnActive]}
+        >
+          <Text style={[styles.acctModeText, mode === 'signIn' && styles.acctModeTextActive]}>
+            Sign in
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.acctFieldRow}>
+        <Icon name="mail" size={16} color={colors.inkFaint} strokeWidth={1.7} />
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.inkFaint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          style={styles.acctInput}
+        />
+      </View>
+      <View style={styles.acctFieldRow}>
+        <Icon name="lock" size={16} color={colors.inkFaint} strokeWidth={1.7} />
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder={mode === 'signUp' ? 'Create a password (6+ characters)' : 'Password'}
+          placeholderTextColor={colors.inkFaint}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.acctInput}
+        />
+      </View>
+
+      {mode === 'signUp' ? (
+        <Pressable
+          onPress={() => setConsented(!consented)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: consented }}
+          style={styles.consentRow}
+        >
+          <View style={[styles.consentBox, consented && styles.consentBoxChecked]}>
+            {consented ? <Icon name="check" size={12} color={colors.white} strokeWidth={2.4} /> : null}
+          </View>
+          <Text style={styles.consentText}>
+            I've read and agree to the Privacy section below, including that my saved
+            activities and feedback are stored on WhatNow's servers to personalize my plans.
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {error ? <Text style={styles.acctError}>{error}</Text> : null}
+
+      <Pressable
+        onPress={onSubmit}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={mode === 'signUp' ? 'Create account' : 'Sign in'}
+        style={({ pressed }) => [styles.acctSubmitBtn, pressed && { opacity: 0.85 }]}
+      >
+        {busy ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <>
+            <Text style={styles.acctSubmitText}>
+              {mode === 'signUp' ? 'Create account' : 'Sign in'}
+            </Text>
+            <Icon name="arrow-right" size={16} color={colors.white} strokeWidth={2} />
+          </>
+        )}
+      </Pressable>
+
+      <Text style={styles.acctSkipNote}>
+        You can skip this — WhatNow still works fully on this device. Signing in is what lets
+        it remember you elsewhere.
+      </Text>
+    </View>
+  );
+}
+
 function FlashLabel({
   flashed,
   flashedText,
@@ -346,6 +574,70 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.inkFaint,
   },
+  acctHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  acctModeRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    padding: 3,
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  acctModeBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: radius.md - 3 },
+  acctModeBtnActive: { backgroundColor: colors.card },
+  acctModeText: { fontSize: 13.5, ...font.semibold, color: colors.inkFaint },
+  acctModeTextActive: { color: colors.coralDeep },
+  acctFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  acctInput: { flex: 1, paddingVertical: 12, fontSize: 14.5, color: colors.ink },
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4, marginBottom: 12 },
+  consentBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  consentBoxChecked: { backgroundColor: colors.coralDeep, borderColor: colors.coralDeep },
+  consentText: { flex: 1, fontSize: 13, color: colors.inkSoft, lineHeight: 18.5 },
+  acctError: { fontSize: 13, color: colors.coralDeep, marginBottom: 10 },
+  acctSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.coralDeep,
+    borderRadius: radius.md,
+    paddingVertical: 13,
+  },
+  acctSubmitText: { fontSize: 15, ...font.bold, color: colors.white },
+  acctSkipNote: { fontSize: 12.5, color: colors.inkFaint, marginTop: 12, lineHeight: 18 },
+  acctBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 10,
+  },
+  acctBtnDanger: {
+    backgroundColor: colors.coralDeep,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  acctBtnText: { fontSize: 14, ...font.semibold, color: colors.inkSoft },
   step: { flexDirection: 'row', gap: 12, marginBottom: 14, alignItems: 'flex-start' },
   stepNum: {
     width: 28,
