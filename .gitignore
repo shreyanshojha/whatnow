@@ -12,3 +12,8 @@ dist/
 *.keystore
 ios/
 android/
+
+# Internal planning/strategy docs — useful for Shreyansh locally, but this
+# repo is public, so these stay untracked rather than visible to anyone.
+NEXT_STEPS.md
+UX_RESEARCH_SIMULATION.md

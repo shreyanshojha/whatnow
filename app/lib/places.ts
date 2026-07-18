@@ -24,8 +24,8 @@ export interface NearbyVenue {
 
 export interface NearbyPlace {
   placeName: string | null; // e.g. "Shoreditch, London"
-  amenity: { name: string; kind: string } | null; // e.g. { name: "Victoria Park", kind: "park" }
-  venues: NearbyVenue[]; // fuller list, nearest first, for the "Nearby right now" section
+  venues: NearbyVenue[]; // nearest first — powers both "Nearby right now" and each
+  // activity card's category-matched location tip (see ActivityCard.tsx)
 }
 
 const cache = new Map<string, { at: number; value: NearbyPlace }>();
@@ -194,10 +194,7 @@ export async function fetchNearby(lat: number, lon: number, radius: number = 150
     reverseGeocode(lat, lon),
     nearbyVenues(lat, lon, radius),
   ]);
-  const pick =
-    venues.length > 0 ? venues[Math.floor(Math.random() * Math.min(venues.length, 3))] : null;
-  const amenity = pick ? { name: pick.name, kind: pick.kind } : null;
-  const value: NearbyPlace = { placeName, amenity, venues };
+  const value: NearbyPlace = { placeName, venues };
   cache.set(key, { at: Date.now(), value });
   return value;
 }
