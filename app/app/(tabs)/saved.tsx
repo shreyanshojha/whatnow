@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../components/Icon';
 import { usePlan } from '../../context/PlanContext';
@@ -11,6 +11,17 @@ export default function SavedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { saved, toggleSave, clearSaved } = usePlan();
+
+  const onClearAll = () => {
+    Alert.alert(
+      'Clear all saved activities?',
+      `This removes all ${saved.length} saved ${saved.length === 1 ? 'activity' : 'activities'} from this device. This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear all', style: 'destructive', onPress: clearSaved },
+      ]
+    );
+  };
 
   if (saved.length === 0) {
     return (
@@ -67,7 +78,7 @@ export default function SavedScreen() {
       })}
 
       <Pressable
-        onPress={clearSaved}
+        onPress={onClearAll}
         style={({ pressed }) => [styles.clear, pressed && { opacity: 0.7 }]}
       >
         <Text style={styles.clearText}>Clear all</Text>

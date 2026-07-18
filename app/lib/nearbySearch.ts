@@ -117,7 +117,11 @@ function validateResult(raw: unknown): NearbyResult | null {
  */
 export async function searchNearby(
   config: NearbySearchConfig,
-  placeName: string | null = null
+  placeName: string | null = null,
+  /** Called (shared-key path only) when the request fails specifically
+   * because today's shared beta AI cap was hit — see the matching param
+   * on generateAiPlan in lib/aiPlan.ts. */
+  onCapped?: () => void
 ): Promise<NearbyResult[] | null> {
   const hasByok = !!config.apiKey && !!config.apiKey.trim();
   const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
@@ -164,7 +168,10 @@ export async function searchNearby(
       });
     }
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (hasShared && res.status === 429) onCapped?.();
+      return null;
+    }
     const data = await res.json();
     const blocks: unknown[] = Array.isArray(data?.content) ? data.content : [];
 

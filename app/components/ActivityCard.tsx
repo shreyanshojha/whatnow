@@ -192,7 +192,7 @@ export function ActivityCard({
 
       {personalNote ? (
         <View style={styles.personalRow}>
-          <Icon name="thumb-up" size={12} color={colors.sage} strokeWidth={2} />
+          <Icon name="thumb-up" size={12} color={colors.sageDeep} strokeWidth={2} />
           <Text style={styles.personalText}>{personalNote}</Text>
         </View>
       ) : null}
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   desc: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 21, marginBottom: 14 },
   personalRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -6, marginBottom: 14 },
-  personalText: { flex: 1, fontSize: 12.5, ...font.semibold, color: colors.sage },
+  personalText: { flex: 1, fontSize: 12.5, ...font.semibold, color: colors.sageDeep },
   why: { borderRadius: radius.md, padding: 13, marginBottom: 12 },
   whyLabel: {
     fontSize: 11,
@@ -351,6 +351,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  feedbackBtnUpActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  feedbackBtnUpActive: { backgroundColor: colors.sageDeep, borderColor: colors.sageDeep },
   feedbackBtnDownActive: { backgroundColor: colors.inkFaint, borderColor: colors.inkFaint },
 });

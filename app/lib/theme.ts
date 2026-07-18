@@ -25,10 +25,18 @@ export const colors = {
   coral: '#E8654A',
   coralDeep: '#CF4D33',
   peach: '#F7B267',
+  // sage: fine as an icon/accent/fill color, but never as text and never as
+  // a base for white button labels — only ~2.9:1 with white, below WCAG AA.
+  // Use sageDeep for either of those cases (~5:1 with white).
   sage: '#7AA274',
+  sageDeep: '#4F7A49',
   sky: '#6BA4C9',
   plum: '#9A6FB0',
+  // amber: fine as an icon/accent color, but never as text on bg/card —
+  // only ~2.1:1, well below WCAG AA. Use amberDeep for any text usage
+  // (~5:1 on bg).
   amber: '#E0A24A',
+  amberDeep: '#94601F',
   white: '#FFFFFF',
   // subtle warm gradient stops used behind headers / splash
   glowPeach: '#FFF2E0',

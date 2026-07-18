@@ -45,6 +45,7 @@ export default function PlanScreen() {
     lookOnlineNearby,
     aiApiKey,
     sharedAiAvailable,
+    sharedAiCapped,
     lastPlan,
     planSource,
     planLoading,
@@ -98,6 +99,16 @@ export default function PlanScreen() {
         <View style={styles.aiBadge}>
           <Icon name="inspired" size={13} color={colors.plum} strokeWidth={1.8} />
           <Text style={styles.aiBadgeText}>Composed fresh for you by AI</Text>
+        </View>
+      ) : null}
+
+      {sharedAiCapped && !planLoading ? (
+        <View style={styles.cappedBadge}>
+          <Icon name="info" size={13} color={colors.inkFaint} strokeWidth={1.8} />
+          <Text style={styles.cappedBadgeText}>
+            You've reached today's shared AI limit for the beta — this plan is from WhatNow's
+            built-in matching instead. Resets tomorrow, or add your own API key in Settings.
+          </Text>
         </View>
       ) : null}
 
@@ -397,6 +408,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   aiBadgeText: { fontSize: 12.5, ...font.semibold, color: colors.plum },
+  cappedBadge: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    backgroundColor: colors.bg2,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  cappedBadgeText: { flex: 1, fontSize: 12.5, color: colors.inkFaint, ...font.medium, lineHeight: 18 },
   loading: {
     alignItems: 'center',
     justifyContent: 'center',

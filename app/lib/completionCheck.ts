@@ -24,11 +24,16 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { SavedEntry } from '../context/PlanContext';
 
 const ASKED_KEY = 'whatnow.completionAsked.v1';
 const NOTIF_IDS_KEY = 'whatnow.completionNotifIds.v1';
+// Shown once, ever, right before the very first OS permission prompt — so
+// that prompt (which the OS only lets us show once per install) never
+// appears with zero context. If someone declines the primer, we just skip
+// scheduling for now rather than force the OS dialog on them.
+const PRIMER_SHOWN_KEY = 'whatnow.notifPrimerShown.v1';
 
 // A save needs to be at least this old before we ask — otherwise "did this
 // happen?" would be asked before there's been any real chance to do it.
@@ -107,6 +112,32 @@ async function writeNotifIds(ids: Record<string, string>): Promise<void> {
   }
 }
 
+/** Shows a one-time, plain-language explainer immediately before the OS
+ * permission dialog's first-ever appearance, so that dialog (which iOS/
+ * Android only let an app show once) never appears out of nowhere. Only
+ * ever shown once regardless of the answer — declining just means this
+ * particular save doesn't get a nudge scheduled. */
+async function showPrimerIfNeeded(): Promise<boolean> {
+  const alreadyShown = await AsyncStorage.getItem(PRIMER_SHOWN_KEY);
+  if (alreadyShown) return true;
+  await AsyncStorage.setItem(PRIMER_SHOWN_KEY, '1');
+  return new Promise<boolean>((resolve) => {
+    try {
+      Alert.alert(
+        'One quick nudge?',
+        'WhatNow can send a single reminder a few hours after you save something, just asking whether it actually happened. Nothing else — and you can turn it off anytime from your phone\'s notification settings.',
+        [
+          { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Sounds good', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) }
+      );
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 /** Requests notification permission if it hasn't been decided yet. Never
  * throws, never blocks — if the person denies or this fails for any
  * reason, the app just falls back to the in-app-only check-in. Safe to
@@ -117,6 +148,10 @@ async function ensurePermission(): Promise<boolean> {
     const current = await Notifications.getPermissionsAsync();
     if (current.granted) return true;
     if (!current.canAskAgain) return false;
+
+    const okToAsk = await showPrimerIfNeeded();
+    if (!okToAsk) return false;
+
     const requested = await Notifications.requestPermissionsAsync();
     return !!requested.granted;
   } catch {

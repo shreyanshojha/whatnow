@@ -77,21 +77,34 @@ single reshuffle never buries an activity forever, and a single save never crowd
 else out; it's a gentle nudge that builds up gradually. You can clear the on-device copy at
 any time from the About screen; deleting your account clears the server copy too.
 
-## Optional AI planning
+## AI planning
 
-If you turn on AI planning and provide your own API key, your mood, context, and — if you've
-granted location — a one-line summary of your on-device pattern memory (never raw location
-history, never your saved list) are sent directly from your device to that AI provider (for
-example, Anthropic) to generate a plan. Your API key is stored only in your device's secure
-keychain — never on any WhatNow server, never in the app itself. If this feature is off, if
-no key is set, or if the request fails for any reason, WhatNow instantly falls back to its
-built-in, fully offline matching engine.
+**During the current beta**, AI planning works automatically once you're signed in — you
+don't need to provide your own key. Your mood, context, and — if you've granted location —
+a one-line summary of your on-device pattern memory (never raw location history, never your
+saved list) are sent from your device to a small WhatNow server function, which forwards the
+request to Anthropic using a key that belongs to WhatNow, not you, and returns the result.
+That server function checks a daily usage limit (per person and overall) before forwarding
+anything, purely to keep costs predictable during the beta — it doesn't store your request.
+This is different from the bring-your-own-key model described below: during the beta, your
+requests are proxied through WhatNow's own server rather than going device-to-provider
+directly, specifically so you don't need your own API key to use AI planning.
+
+WhatNow also supports bringing your own API key instead (for a higher personal limit, for
+example) — that option isn't shown in the app's Settings during this beta since the shared
+access above covers everyone by default, but the underlying support exists and may resurface
+later. If it's ever on, your mood/context data goes directly from your device to that AI
+provider, with your key stored only in your device's secure keychain and never on any
+WhatNow server. Either way — beta shared access, your own key, or neither — if a request
+fails for any reason, WhatNow instantly falls back to its built-in, fully offline matching
+engine. You'll never see a broken plan.
 
 ## Optional "Look online nearby" search
 
-This reuses your AI planning API key — no separate key is needed. When you tap "Search,"
-your rough nearby place name (if location is granted) is sent directly from your device to
-that same AI provider, which searches the live web and returns real local events and new
+This works the same way AI planning does above — automatically during the beta via WhatNow's
+server, or via your own API key if you've set one, no separate key needed either way. When
+you tap "Search," your rough nearby place name (if location is granted) is sent to that same
+AI provider, which searches the live web and returns real local events and new
 movies playing near you. Nothing is stored by WhatNow; results only exist on your screen for
 that session.
 

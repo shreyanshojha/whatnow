@@ -279,7 +279,12 @@ export async function generateAiPlan(
   nearbyName: string | null = null,
   patternHint: string | null = null,
   avoidTitles: string[] = [],
-  nearbyVenues: NearbyVenueName[] = []
+  nearbyVenues: NearbyVenueName[] = [],
+  /** Called (shared-key path only) when the request fails specifically
+   * because today's shared beta AI cap was hit — lets the caller show a
+   * "you're capped, here's the built-in match instead" notice rather than
+   * silently looking identical to any other fallback reason. */
+  onCapped?: () => void
 ): Promise<Activity[] | null> {
   const hasByok = !!config.apiKey && !!config.apiKey.trim();
   const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
@@ -337,7 +342,14 @@ export async function generateAiPlan(
       });
     }
 
-    if (!res.ok) return null; // covers a hit cap, an expired session, etc. — silent fallback
+    if (!res.ok) {
+      // ai-proxy returns 429 specifically (and only) when today's shared
+      // cap — per-user or global — has been hit; every other failure mode
+      // (expired session, missing config, provider error) uses a different
+      // status, so this check doesn't false-positive on those.
+      if (hasShared && res.status === 429) onCapped?.();
+      return null;
+    }
     const data = await res.json();
     const text: unknown = data?.content?.[0]?.text;
     if (typeof text !== 'string') return null;

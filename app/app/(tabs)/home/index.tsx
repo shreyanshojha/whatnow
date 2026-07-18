@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 14,
-    color: colors.amber,
+    color: colors.amberDeep,
     ...font.semibold,
     marginBottom: 8,
   },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   crisisH: { fontSize: 14.5, ...font.bold, color: colors.ink, marginBottom: 6 },
   crisisBody: { fontSize: 13.5, color: colors.inkSoft, ...font.regular, lineHeight: 20, marginBottom: 14 },
   crisisBtn: {
-    backgroundColor: colors.sage,
+    backgroundColor: colors.sageDeep,
     borderRadius: radius.pill,
     paddingVertical: 11,
     alignItems: 'center',
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     ...shadow.soft,
   },
   checkInHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  checkInHeader: { fontSize: 12.5, ...font.bold, color: colors.amber, textTransform: 'uppercase', letterSpacing: 0.4 },
+  checkInHeader: { fontSize: 12.5, ...font.bold, color: colors.amberDeep, textTransform: 'uppercase', letterSpacing: 0.4 },
   checkInBody: { fontSize: 14.5, ...font.medium, color: colors.ink, lineHeight: 21, marginBottom: 12 },
   checkInRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   checkInBtn: {
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
   },
-  checkInBtnYes: { backgroundColor: colors.sage, borderColor: colors.sage },
+  checkInBtnYes: { backgroundColor: colors.sageDeep, borderColor: colors.sageDeep },
   checkInBtnYesText: { fontSize: 13.5, ...font.bold, color: colors.white },
   checkInBtnNo: { backgroundColor: 'transparent', borderColor: colors.line },
   checkInBtnNoText: { fontSize: 13.5, ...font.semibold, color: colors.inkSoft },

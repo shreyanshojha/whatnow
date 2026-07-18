@@ -165,6 +165,12 @@ interface PlanContextValue {
    * backend (see lib/betaConfig.ts) — lets screens gate UI on "is AI
    * available at all" without caring which path is actually in use. */
   sharedAiAvailable: boolean;
+  /** True right after a makePlan/lookOnlineNearby call that specifically hit
+   * today's shared beta AI cap (not any other failure reason) — lets a
+   * screen show "you're capped for today, here's WhatNow's built-in match
+   * instead" rather than a plan that's silently indistinguishable from any
+   * other fallback. Reset at the start of every subsequent attempt. */
+  sharedAiCapped: boolean;
   // Live nearby events (optional, bring-your-own-key)
   eventsApiKey: string;
   setEventsApiKey: (key: string) => void;
@@ -205,6 +211,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [nearbySearchResults, setNearbySearchResults] = useState<NearbyResult[] | null>(null);
   const [nearbySearchLoading, setNearbySearchLoading] = useState(false);
+  const [sharedAiCapped, setSharedAiCapped] = useState(false);
 
   const [lastPlan, setLastPlan] = useState<PlanCard[]>([]);
   const [planSource, setPlanSource] = useState<PlanSource>(null);
@@ -419,6 +426,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         // BYOK, once configured and enabled, always wins over the shared beta
         // path — someone who's brought their own key gets their own limits.
         const useShared = !byokReady && sharedAiAvailable;
+        let cappedThisAttempt = false;
         if (byokReady || useShared) {
           // Pattern hint is computed fresh from on-device history only — never stored,
           // never sent anywhere except as part of this one plan request.
@@ -432,7 +440,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
             nearbyRef.current?.placeName ?? null,
             patternHint,
             avoidTitles,
-            nearbyRef.current?.venues ?? []
+            nearbyRef.current?.venues ?? [],
+            useShared ? () => { cappedThisAttempt = true; } : undefined
           );
           if (aiActivities && aiActivities.length >= 2) {
             cards = aiActivities.map((activity) => ({ activity, index: null, mood: input.mood }));
@@ -444,6 +453,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }
+        // Reset every attempt — a capped notice from a previous plan should
+        // never linger once a new one (capped or not) has been generated.
+        setSharedAiCapped(cappedThisAttempt);
 
         if (!cards) {
           // This person's own accept/reject history for this mood, folded gently
@@ -523,9 +535,18 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     }
     setNearbySearchLoading(true);
     try {
+      let cappedThisAttempt = false;
       const config = byokReady ? { apiKey: aiApiKey } : { sharedAccessToken: session?.access_token };
-      const results = await searchNearby(config, nearbyRef.current?.placeName ?? null);
+      const results = await searchNearby(
+        config,
+        nearbyRef.current?.placeName ?? null,
+        useShared ? () => { cappedThisAttempt = true; } : undefined
+      );
       setNearbySearchResults(results);
+      // Always reset, not just on the shared path — otherwise a stale
+      // "you're capped" notice from an earlier shared-path attempt could
+      // survive into a request that actually used a BYOK key.
+      setSharedAiCapped(useShared && cappedThisAttempt);
       if (results && byokReady) {
         await recordNearbySearchUse();
         refreshUsageCounts();
@@ -699,6 +720,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setLastPlan([]);
     setPlanSource(null);
     setNearbySearchResults(null);
+    setSharedAiCapped(false);
   }, []);
 
   const value: PlanContextValue = {
@@ -743,6 +765,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     aiApiKey,
     setAiApiKey,
     sharedAiAvailable,
+    sharedAiCapped,
     eventsApiKey,
     setEventsApiKey,
     clearLocationHistory,

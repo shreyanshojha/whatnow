@@ -266,7 +266,9 @@ export default function ContextScreen() {
                 <Pressable
                   onPress={onManualSearch}
                   disabled={!manualQuery.trim() || manualSearching}
+                  hitSlop={8}
                   accessibilityRole="button"
+                  accessibilityLabel="Search"
                   style={({ pressed }) => [
                     styles.manualSearchBtn,
                     (!manualQuery.trim() || manualSearching) && styles.ctaDisabledGhost,
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 18,
   },
-  kidsToggleActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  kidsToggleActive: { backgroundColor: colors.sageDeep, borderColor: colors.sageDeep },
   kidsToggleText: { flex: 1, fontSize: 14.5, color: colors.ink, ...font.medium },
   kidsToggleTextActive: { color: colors.white, ...font.semibold },
   kidsCheck: {
@@ -440,9 +442,9 @@ const styles = StyleSheet.create({
     ...font.regular,
   },
   manualSearchBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.coral,
     alignItems: 'center',
     justifyContent: 'center',

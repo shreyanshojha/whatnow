@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 10 },
   brand: { fontSize: 30, ...fontDisplay.bold, color: colors.ink, letterSpacing: -0.6 },
-  tagline: { fontSize: 15, color: colors.amber, ...font.semibold, marginTop: 4, marginBottom: 16 },
+  tagline: { fontSize: 15, color: colors.amberDeep, ...font.semibold, marginTop: 4, marginBottom: 16 },
   p: { fontSize: 15.5, color: colors.inkSoft, lineHeight: 23, marginBottom: 20 },
   card: {
     backgroundColor: colors.card,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
   },
   inviteHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   inviteLabel: { fontSize: 12.5, ...font.semibold, color: colors.inkFaint, textTransform: 'uppercase', letterSpacing: 0.3 },
-  inviteCount: { fontSize: 12.5, ...font.semibold, color: colors.sage },
+  inviteCount: { fontSize: 12.5, ...font.semibold, color: colors.sageDeep },
   inviteCode: { fontSize: 22, ...fontDisplay.bold, color: colors.coralDeep, letterSpacing: 2, marginTop: 6, marginBottom: 12 },
   inviteShareBtn: {
     flexDirection: 'row',
