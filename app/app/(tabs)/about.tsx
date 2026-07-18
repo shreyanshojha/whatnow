@@ -176,7 +176,9 @@ export default function AboutScreen() {
           instantly — you'll never see a broken plan. To keep any one day's usage
           reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans per
           day (resets at midnight) — after that, it simply uses the built-in engine until
-          tomorrow.
+          tomorrow. The same key also powers the optional "Look online nearby" search on
+          your plan screen, which looks up real local events and new movies playing near
+          you — that's a separate, smaller daily cap, shown next to its own search button.
         </Text>
         <TextInput
           value={keyDraft}

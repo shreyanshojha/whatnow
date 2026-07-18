@@ -40,6 +40,10 @@ export default function PlanScreen() {
     nearby,
     nearbyEvents,
     eventsLoading,
+    nearbySearchResults,
+    nearbySearchLoading,
+    lookOnlineNearby,
+    aiApiKey,
     lastPlan,
     planSource,
     planLoading,
@@ -156,6 +160,14 @@ export default function PlanScreen() {
 
       <NearbyRightNow nearby={nearby} events={nearbyEvents} eventsLoading={eventsLoading} />
 
+      {aiApiKey ? (
+        <LookOnlineNearby
+          results={nearbySearchResults}
+          loading={nearbySearchLoading}
+          onSearch={lookOnlineNearby}
+        />
+      ) : null}
+
       <Pressable
         onPress={() => {
           resetFlow();
@@ -259,6 +271,90 @@ function NearbyRightNow({
   );
 }
 
+/** A web-search-backed complement to NearbyRightNow — surfaces unlisted local
+ * events (Eventbrite meetups, pop-ups, anything a structured API wouldn't
+ * carry) and newly-released movies playing nearby, via the same Anthropic
+ * key used for AI planning (see lib/nearbySearch.ts). Starts collapsed as a
+ * single button so it never looks like a broken, empty section. */
+function LookOnlineNearby({
+  results,
+  loading,
+  onSearch,
+}: {
+  results: ReturnType<typeof usePlan>['nearbySearchResults'];
+  loading: boolean;
+  onSearch: () => Promise<void>;
+}) {
+  const [searched, setSearched] = React.useState(false);
+
+  const handlePress = () => {
+    setSearched(true);
+    onSearch().catch(() => {});
+  };
+
+  return (
+    <View style={styles.nearbySection}>
+      <View style={styles.lookRow}>
+        <Text style={styles.nearbyH}>Look online nearby</Text>
+        {!loading ? (
+          <Pressable
+            onPress={handlePress}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.lookBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Icon name="curious" size={14} color={colors.coralDeep} strokeWidth={1.9} />
+            <Text style={styles.lookBtnText}>
+              {searched ? 'Search again' : 'Search'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {loading ? (
+        <View style={styles.nearbyRow}>
+          <ActivityIndicator size="small" color={colors.coralDeep} />
+          <Text style={[styles.nearbyMeta, { marginLeft: 10 }]}>
+            Searching the web for events and new movies…
+          </Text>
+        </View>
+      ) : !searched ? (
+        <Text style={styles.lookHint}>
+          Finds unlisted local events and new movies playing nearby — things a
+          structured events API wouldn't know about.
+        </Text>
+      ) : results === null ? (
+        <Text style={styles.lookHint}>
+          Couldn't find anything just now — try again in a bit.
+        </Text>
+      ) : (
+        results.map((r, i) => (
+          <Pressable
+            key={`${r.name}-${i}`}
+            style={styles.nearbyRow}
+            disabled={!r.url}
+            onPress={() => {
+              if (r.url) Linking.openURL(r.url).catch(() => {});
+            }}
+          >
+            <View style={styles.nearbyIconWrap}>
+              <Icon
+                name={r.category === 'movie' ? 'venue-cinema' : 'ticket'}
+                size={17}
+                color={colors.inkSoft}
+                strokeWidth={1.7}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nearbyName}>{r.name}</Text>
+              <Text style={styles.nearbyMeta}>{r.blurb}</Text>
+            </View>
+          </Pressable>
+        ))
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 6 },
@@ -307,6 +403,26 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   nearbyH: { fontSize: 15, ...font.bold, color: colors.ink, marginBottom: 10 },
+  lookRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  lookBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.bg,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.coral,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+  },
+  lookBtnText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
+  lookHint: { fontSize: 13, color: colors.inkFaint, lineHeight: 19 },
   nearbyRow: {
     flexDirection: 'row',
     alignItems: 'center',

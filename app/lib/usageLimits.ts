@@ -17,9 +17,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const MAX_AI_PLANS_PER_DAY = 20;
 export const MAX_EVENTS_LOOKUPS_PER_DAY = 30;
+// Lower than the other two — each call can run several web searches at
+// $10/1,000 searches plus tokens, so it costs more per use than a plan
+// composition or a Ticketmaster lookup.
+export const MAX_NEARBY_SEARCHES_PER_DAY = 10;
 
 const AI_USAGE_KEY = 'whatnow.usage.aiPlans.v1';
 const EVENTS_USAGE_KEY = 'whatnow.usage.events.v1';
+const NEARBY_SEARCH_USAGE_KEY = 'whatnow.usage.nearbySearch.v1';
 
 interface DailyCount {
   date: string; // local YYYY-MM-DD
@@ -77,4 +82,16 @@ export async function canUseEventsLookupToday(): Promise<boolean> {
 
 export async function recordEventsLookupUse(): Promise<void> {
   await bumpCount(EVENTS_USAGE_KEY);
+}
+
+export async function nearbySearchesUsedToday(): Promise<number> {
+  return readCount(NEARBY_SEARCH_USAGE_KEY);
+}
+
+export async function canUseNearbySearchToday(): Promise<boolean> {
+  return (await nearbySearchesUsedToday()) < MAX_NEARBY_SEARCHES_PER_DAY;
+}
+
+export async function recordNearbySearchUse(): Promise<void> {
+  await bumpCount(NEARBY_SEARCH_USAGE_KEY);
 }

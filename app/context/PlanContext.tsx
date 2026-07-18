@@ -29,6 +29,7 @@ import {
   recordShown,
 } from '../lib/feedback';
 import { addLocationVisit, clearLocationHistory, getPatternHint } from '../lib/locationHistory';
+import { NearbyResult, searchNearby } from '../lib/nearbySearch';
 import { generatePlan, PlanInput, WeatherState } from '../lib/plan';
 import { NearbyPlace, fetchNearby } from '../lib/places';
 import {
@@ -42,12 +43,16 @@ import {
 import {
   MAX_AI_PLANS_PER_DAY,
   MAX_EVENTS_LOOKUPS_PER_DAY,
+  MAX_NEARBY_SEARCHES_PER_DAY,
   aiPlansUsedToday,
   canUseAiPlanToday,
   canUseEventsLookupToday,
+  canUseNearbySearchToday,
   eventsLookupsUsedToday,
+  nearbySearchesUsedToday,
   recordAiPlanUse,
   recordEventsLookupUse,
+  recordNearbySearchUse,
 } from '../lib/usageLimits';
 import { fetchWeather } from '../lib/weather';
 
@@ -97,6 +102,10 @@ interface PlanContextValue {
   requestLocation: () => Promise<void>;
   nearbyEvents: LiveEvent[];
   eventsLoading: boolean;
+  // "Look online nearby" web search (optional, bring-your-own-key — same key as AI planning)
+  nearbySearchResults: NearbyResult[] | null;
+  nearbySearchLoading: boolean;
+  lookOnlineNearby: () => Promise<void>;
   // plan
   lastPlan: PlanCard[];
   planSource: PlanSource;
@@ -126,6 +135,7 @@ interface PlanContextValue {
   // Reasonable daily caps on the BYOK calls (see lib/usageLimits.ts)
   aiPlansRemainingToday: number;
   eventsLookupsRemainingToday: number;
+  nearbySearchesRemainingToday: number;
 }
 
 const Ctx = createContext<PlanContextValue | null>(null);
@@ -144,6 +154,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
   const [nearbyEvents, setNearbyEvents] = useState<LiveEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [nearbySearchResults, setNearbySearchResults] = useState<NearbyResult[] | null>(null);
+  const [nearbySearchLoading, setNearbySearchLoading] = useState(false);
 
   const [lastPlan, setLastPlan] = useState<PlanCard[]>([]);
   const [planSource, setPlanSource] = useState<PlanSource>(null);
@@ -157,6 +169,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [aiPlansRemainingToday, setAiPlansRemainingToday] = useState(MAX_AI_PLANS_PER_DAY);
   const [eventsLookupsRemainingToday, setEventsLookupsRemainingToday] = useState(
     MAX_EVENTS_LOOKUPS_PER_DAY
+  );
+  const [nearbySearchesRemainingToday, setNearbySearchesRemainingToday] = useState(
+    MAX_NEARBY_SEARCHES_PER_DAY
   );
 
   // ---- Guards against the makePlan/location race ----
@@ -181,6 +196,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     aiPlansUsedToday().then((used) => setAiPlansRemainingToday(Math.max(0, MAX_AI_PLANS_PER_DAY - used)));
     eventsLookupsUsedToday().then((used) =>
       setEventsLookupsRemainingToday(Math.max(0, MAX_EVENTS_LOOKUPS_PER_DAY - used))
+    );
+    nearbySearchesUsedToday().then((used) =>
+      setNearbySearchesRemainingToday(Math.max(0, MAX_NEARBY_SEARCHES_PER_DAY - used))
     );
   }, []);
 
@@ -353,6 +371,30 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     return next;
   }, [lastPlan, makePlan]);
 
+  /** "Look online nearby" — searches the live web (via the same Anthropic
+   * key used for AI planning) for real, currently-happening local events
+   * and new movies that structured APIs like Ticketmaster/OpenStreetMap
+   * don't cover. Fully optional: does nothing without a key, silently
+   * clears results on any failure so the section just disappears rather
+   * than showing something broken. See lib/nearbySearch.ts. */
+  const lookOnlineNearby = useCallback(async (): Promise<void> => {
+    if (!aiApiKey || !(await canUseNearbySearchToday())) {
+      setNearbySearchResults(null);
+      return;
+    }
+    setNearbySearchLoading(true);
+    try {
+      const results = await searchNearby({ apiKey: aiApiKey }, nearbyRef.current?.placeName ?? null);
+      setNearbySearchResults(results);
+      if (results) {
+        await recordNearbySearchUse();
+        refreshUsageCounts();
+      }
+    } finally {
+      setNearbySearchLoading(false);
+    }
+  }, [aiApiKey, refreshUsageCounts]);
+
   const requestLocation = useCallback((): Promise<void> => {
     // Registered in locationPromiseRef so makePlan can wait for this exact
     // in-flight request instead of racing it — see awaitPendingLocation above.
@@ -463,6 +505,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     setWithKids(false);
     setLastPlan([]);
     setPlanSource(null);
+    setNearbySearchResults(null);
   }, []);
 
   const value: PlanContextValue = {
@@ -486,6 +529,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     requestLocation,
     nearbyEvents,
     eventsLoading,
+    nearbySearchResults,
+    nearbySearchLoading,
+    lookOnlineNearby,
     lastPlan,
     planSource,
     planLoading,
@@ -507,6 +553,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     resetFlow,
     aiPlansRemainingToday,
     eventsLookupsRemainingToday,
+    nearbySearchesRemainingToday,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

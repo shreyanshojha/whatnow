@@ -64,6 +64,14 @@ keychain — never on any WhatNow server, never in the app itself. If this featu
 no key is set, or if the request fails for any reason, WhatNow instantly falls back to its
 built-in, fully offline matching engine.
 
+## Optional "Look online nearby" search
+
+This reuses your AI planning API key — no separate key is needed. When you tap "Search,"
+your rough nearby place name (if location is granted) is sent directly from your device to
+that same AI provider, which searches the live web and returns real local events and new
+movies playing near you. Nothing is stored by WhatNow; results only exist on your screen for
+that session.
+
 ## Optional live events
 
 If you turn on live nearby events and provide your own Ticketmaster API key, your
