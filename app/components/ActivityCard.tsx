@@ -1,5 +1,6 @@
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Activity,
   CATS,
@@ -44,6 +45,7 @@ export function ActivityCard({
   const a = activity;
   const cat = CATS[a.cat];
   const anim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const heartScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (reducedMotion) {
@@ -59,6 +61,27 @@ export function ActivityCard({
   }, [anim, order, reducedMotion]);
 
   const placeIcon = a.place === 'outdoor' ? '🌳' : a.place === 'indoor' ? '🏠' : '🔀';
+
+  // Saving is the app's most-repeated action — give it real delight: a
+  // success haptic and a quick bounce, not just an instant icon swap.
+  // Unsaving stays understated (a lighter tick, no bounce) since it's
+  // usually tidying up rather than a moment worth celebrating.
+  const handleToggleSave = () => {
+    const willSave = !saved;
+    if (Platform.OS !== 'web') {
+      const feedback = willSave
+        ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        : Haptics.selectionAsync();
+      feedback.catch(() => {});
+    }
+    if (willSave && !reducedMotion) {
+      Animated.sequence([
+        Animated.timing(heartScale, { toValue: 1.35, duration: 120, useNativeDriver: true }),
+        Animated.spring(heartScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+      ]).start();
+    }
+    onToggleSave(a);
+  };
 
   // Surface a real nearby amenity as a gentle tip when it fits the category.
   const amenity = nearby?.amenity;
@@ -91,16 +114,22 @@ export function ActivityCard({
           <Text style={[styles.catLabel, { color: cat.color }]}>{cat.label}</Text>
         </View>
         <Pressable
-          onPress={() => onToggleSave(a)}
+          onPress={handleToggleSave}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityState={{ selected: saved }}
           accessibilityLabel={saved ? 'Remove from saved' : 'Save for later'}
           style={styles.saveBtn}
         >
-          <Text style={[styles.heart, saved && { color: colors.coral }]}>
+          <Animated.Text
+            style={[
+              styles.heart,
+              saved && { color: colors.coral },
+              { transform: [{ scale: heartScale }] },
+            ]}
+          >
             {saved ? '♥' : '♡'}
-          </Text>
+          </Animated.Text>
         </Pressable>
       </View>
 

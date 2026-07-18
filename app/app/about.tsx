@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Alert,
   Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -135,12 +136,28 @@ export default function AboutScreen() {
           removes both for good. Your saved list also stays on this device. Deny location
           and everything still works, just without the location-aware tuning.
         </Text>
-        <Text style={styles.keySavedText} onPress={onClearHistory}>
-          {historyCleared ? 'Cleared ✓' : 'Clear location history'}
-        </Text>
-        <Text style={styles.keySavedText} onPress={onClearFeedback}>
-          {learningCleared ? 'Cleared ✓' : 'Clear learning history'}
-        </Text>
+        <Pressable
+          onPress={onClearHistory}
+          accessibilityRole="button"
+          accessibilityLabel="Clear location history"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.keySavedText}>
+            {historyCleared ? 'Cleared ✓' : 'Clear location history'}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onClearFeedback}
+          accessibilityRole="button"
+          accessibilityLabel="Clear learning history"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.keySavedText}>
+            {learningCleared ? 'Cleared ✓' : 'Clear learning history'}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.card}>
@@ -175,9 +192,15 @@ export default function AboutScreen() {
           style={styles.keyInput}
         />
         <View style={styles.keyFooterRow}>
-          <Text style={styles.keySavedText} onPress={onSaveKey}>
-            {savedFlash ? 'Saved ✓' : 'Save key'}
-          </Text>
+          <Pressable
+            onPress={onSaveKey}
+            accessibilityRole="button"
+            accessibilityLabel="Save AI API key"
+            hitSlop={6}
+            style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.keySavedText}>{savedFlash ? 'Saved ✓' : 'Save key'}</Text>
+          </Pressable>
           {aiEnabled && aiApiKey ? (
             <Text style={styles.usageText}>
               {aiPlansRemainingToday} of {MAX_AI_PLANS_PER_DAY} left today
@@ -211,9 +234,15 @@ export default function AboutScreen() {
             {eventsLookupsRemainingToday} of {MAX_EVENTS_LOOKUPS_PER_DAY} left today
           </Text>
         ) : null}
-        <Text style={styles.keySavedText} onPress={onSaveEventsKey}>
-          {eventsSavedFlash ? 'Saved ✓' : 'Save key'}
-        </Text>
+        <Pressable
+          onPress={onSaveEventsKey}
+          accessibilityRole="button"
+          accessibilityLabel="Save Ticketmaster API key"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.keySavedText}>{eventsSavedFlash ? 'Saved ✓' : 'Save key'}</Text>
+        </Pressable>
       </View>
 
       <Text style={styles.credit}>
@@ -278,13 +307,17 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     color: colors.ink,
   },
-  keySavedText: {
+  keyActionBtn: {
     marginTop: 10,
     alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  keySavedText: {
     fontSize: 14,
     fontWeight: font.semibold,
     color: colors.coralDeep,
-    paddingVertical: 4,
   },
   keyFooterRow: {
     flexDirection: 'row',

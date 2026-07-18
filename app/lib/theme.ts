@@ -6,7 +6,9 @@ export const colors = {
   card: '#FFFFFF',
   ink: '#2C2320',
   inkSoft: '#6B5D54',
-  inkFaint: '#9A8B80',
+  // Darkened from #9A8B80 (was ~3.1:1 on bg, below WCAG AA) to clear 4.5:1
+  // with real margin — this color is used for meta text throughout the app.
+  inkFaint: '#726357',
   line: '#EFE2D4',
   coral: '#E8654A',
   coralDeep: '#CF4D33',

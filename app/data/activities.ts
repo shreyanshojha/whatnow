@@ -38,6 +38,13 @@ export interface Mood {
   id: MoodId;
   emo: string;
   word: string;
+  /** Each mood gets its own identity instead of every mood sharing the same
+   * coral accent — grouped by emotional register (calm-needed, high-arousal,
+   * low/quiet, settled-positive, seeking-stimulation) using the existing
+   * palette so no new colors enter the system. Coral stays reserved for the
+   * one universal primary CTA. */
+  color: string;
+  tint: string;
 }
 
 export interface Category {
@@ -62,20 +69,23 @@ export interface Activity {
   why: Partial<Record<MoodId, string>>;
 }
 
-/* ---- Moods ---- */
+/* ---- Moods ----
+   Colors cluster by emotional register, reusing the existing palette:
+   sky = calm-needed, amber = high-arousal, plum = low/quiet,
+   sage = settled-positive, peach = seeking-stimulation. */
 export const MOODS: Mood[] = [
-  { id: 'restless', emo: '🌀', word: 'restless' },
-  { id: 'drained', emo: '🪫', word: 'drained' },
-  { id: 'anxious', emo: '😰', word: 'anxious' },
-  { id: 'bored', emo: '🥱', word: 'bored' },
-  { id: 'low', emo: '🌧️', word: 'low' },
-  { id: 'wired', emo: '⚡', word: 'wired' },
-  { id: 'content', emo: '🌿', word: 'content' },
-  { id: 'inspired', emo: '✨', word: 'inspired' },
-  { id: 'lonely', emo: '🌙', word: 'lonely' },
-  { id: 'overwhelmed', emo: '🌊', word: 'overwhelmed' },
-  { id: 'playful', emo: '🎈', word: 'playful' },
-  { id: 'curious', emo: '🔭', word: 'curious' },
+  { id: 'restless', emo: '🌀', word: 'restless', color: '#E0A24A', tint: '#FBF1DF' },
+  { id: 'drained', emo: '🪫', word: 'drained', color: '#9A6FB0', tint: '#F3ECF7' },
+  { id: 'anxious', emo: '😰', word: 'anxious', color: '#6BA4C9', tint: '#E9F2F8' },
+  { id: 'bored', emo: '🥱', word: 'bored', color: '#F7B267', tint: '#FBEEE3' },
+  { id: 'low', emo: '🌧️', word: 'low', color: '#9A6FB0', tint: '#F3ECF7' },
+  { id: 'wired', emo: '⚡', word: 'wired', color: '#E0A24A', tint: '#FBF1DF' },
+  { id: 'content', emo: '🌿', word: 'content', color: '#7AA274', tint: '#EEF4ED' },
+  { id: 'inspired', emo: '✨', word: 'inspired', color: '#7AA274', tint: '#EEF4ED' },
+  { id: 'lonely', emo: '🌙', word: 'lonely', color: '#9A6FB0', tint: '#F3ECF7' },
+  { id: 'overwhelmed', emo: '🌊', word: 'overwhelmed', color: '#6BA4C9', tint: '#E9F2F8' },
+  { id: 'playful', emo: '🎈', word: 'playful', color: '#F7B267', tint: '#FBEEE3' },
+  { id: 'curious', emo: '🔭', word: 'curious', color: '#F7B267', tint: '#FBEEE3' },
 ];
 
 export const MOOD_WORD: Record<string, string> = Object.fromEntries(

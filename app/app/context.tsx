@@ -68,9 +68,14 @@ export default function ContextScreen() {
         showsVerticalScrollIndicator={false}
       >
         {moodMeta ? (
-          <View style={styles.moodPill}>
+          <View
+            style={[
+              styles.moodPill,
+              { backgroundColor: moodMeta.tint, borderColor: moodMeta.color },
+            ]}
+          >
             <Text style={styles.moodPillEmo}>{moodMeta.emo}</Text>
-            <Text style={styles.moodPillText}>
+            <Text style={[styles.moodPillText, { color: moodMeta.color }]}>
               Feeling {moodMeta.word}
             </Text>
           </View>
@@ -175,8 +180,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFF7F3',
-    borderColor: colors.coral,
     borderWidth: 1,
     borderRadius: radius.pill,
     paddingVertical: 6,
@@ -187,7 +190,6 @@ const styles = StyleSheet.create({
   moodPillText: {
     fontSize: 13.5,
     fontWeight: font.semibold,
-    color: colors.coralDeep,
     textTransform: 'capitalize',
   },
   h1: {

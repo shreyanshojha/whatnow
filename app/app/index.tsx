@@ -69,12 +69,12 @@ export default function MoodScreen() {
                 accessibilityLabel={`Mood: ${m.word}`}
                 style={({ pressed }) => [
                   styles.mood,
-                  active && styles.moodActive,
+                  active && { borderColor: m.color, backgroundColor: m.tint },
                   pressed && styles.moodPressed,
                 ]}
               >
                 <Text style={styles.moodEmo}>{m.emo}</Text>
-                <Text style={[styles.moodWord, active && styles.moodWordActive]}>
+                <Text style={[styles.moodWord, active && { color: m.color }]}>
                   {m.word}
                 </Text>
               </Pressable>
@@ -153,10 +153,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     ...shadow.soft,
   },
-  moodActive: {
-    borderColor: colors.coral,
-    backgroundColor: '#FFF7F3',
-  },
   moodPressed: { opacity: 0.75, transform: [{ scale: 0.97 }] },
   moodEmo: { fontSize: 34 },
   moodWord: {
@@ -165,7 +161,6 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     textTransform: 'capitalize',
   },
-  moodWordActive: { color: colors.coralDeep },
   footer: {
     position: 'absolute',
     left: 0,
