@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../../components/Icon';
 import { Segmented } from '../../../components/Segmented';
 import { usePlan } from '../../../context/PlanContext';
-import { MOODS } from '../../../data/activities';
+import { CATS, CatId, MOODS, PLACE_LABEL, TIME_LABEL } from '../../../data/activities';
 import { PlaceCandidate, SearchRadius, searchPlace } from '../../../lib/places';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 import { weatherIconName, weatherNote } from '../../../lib/weather';
@@ -22,7 +22,9 @@ export default function ContextScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
-    mood,
+    moods,
+    categories,
+    toggleCategory,
     energy,
     setEnergy,
     time,
@@ -44,7 +46,9 @@ export default function ContextScreen() {
     freeformDescription,
   } = usePlan();
 
-  const moodMeta = MOODS.find((m) => m.id === mood);
+  const selectedMoodMetas = moods
+    .map((id) => MOODS.find((m) => m.id === id))
+    .filter((m): m is NonNullable<typeof m> => !!m);
 
   // "Search a place instead" — for anyone who'd rather type a city/area than
   // share GPS (denied it, doesn't want to, or just wants a different place
@@ -122,17 +126,17 @@ export default function ContextScreen() {
               "{freeformDescription}"
             </Text>
           </View>
-        ) : moodMeta ? (
-          <View
-            style={[
-              styles.moodPill,
-              { backgroundColor: moodMeta.tint, borderColor: moodMeta.color },
-            ]}
-          >
-            <Icon name={moodMeta.id} size={16} color={moodMeta.color} strokeWidth={1.9} />
-            <Text style={[styles.moodPillText, { color: moodMeta.color }]}>
-              Feeling {moodMeta.word}
-            </Text>
+        ) : selectedMoodMetas.length > 0 ? (
+          <View style={styles.moodPillRow}>
+            {selectedMoodMetas.map((m) => (
+              <View
+                key={m.id}
+                style={[styles.moodPill, { backgroundColor: m.tint, borderColor: m.color }]}
+              >
+                <Icon name={m.id} size={16} color={m.color} strokeWidth={1.9} />
+                <Text style={[styles.moodPillText, { color: m.color }]}>{m.word}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -156,8 +160,8 @@ export default function ContextScreen() {
           value={time}
           onChange={setTime}
           options={[
-            { val: 15, label: '15 min', ic: 'clock', aria: '15 minutes' },
-            { val: 60, label: '~1 hour', ic: 'clock', aria: 'About one hour' },
+            { val: 15, label: TIME_LABEL[15], ic: 'clock', aria: '15 minutes' },
+            { val: 60, label: TIME_LABEL[60], ic: 'clock', aria: 'About one hour' },
             { val: 240, label: 'Half-day', ic: 'clock', aria: 'Half a day' },
           ]}
         />
@@ -178,7 +182,7 @@ export default function ContextScreen() {
           options={[
             { val: 'indoor', label: 'Indoor', ic: 'indoor' },
             { val: 'outdoor', label: 'Outdoor', ic: 'outdoor' },
-            { val: 'either', label: 'Either', ic: 'either' },
+            { val: 'either', label: PLACE_LABEL.either, ic: 'either' },
           ]}
         />
         <Segmented
@@ -191,6 +195,31 @@ export default function ContextScreen() {
             { val: 'treat', label: 'Treat myself', ic: 'budget-treat' },
           ]}
         />
+
+        <Text style={styles.catLabel}>What kind of thing (optional)</Text>
+        <View style={styles.catRow}>
+          {(Object.keys(CATS) as CatId[]).map((id) => {
+            const cat = CATS[id];
+            const active = categories.includes(id);
+            return (
+              <Pressable
+                key={id}
+                onPress={() => toggleCategory(id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={cat.label}
+                style={({ pressed }) => [
+                  styles.catChip,
+                  active && { backgroundColor: cat.tint, borderColor: cat.color },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Icon name={id} size={15} color={active ? cat.color : colors.inkFaint} strokeWidth={1.8} />
+                <Text style={[styles.catChipText, active && { color: cat.color }]}>{cat.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <Pressable
           onPress={() => setWithKids(!withKids)}
@@ -340,6 +369,12 @@ export default function ContextScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
+  moodPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
   moodPill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -364,6 +399,30 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sub: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 21, marginBottom: 22 },
+  catLabel: {
+    fontSize: 13,
+    color: colors.inkSoft,
+    ...font.semibold,
+    marginBottom: 10,
+  },
+  catRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 13,
+  },
+  catChipText: { fontSize: 13, ...font.medium, color: colors.inkSoft },
   kidsToggle: {
     flexDirection: 'row',
     alignItems: 'center',

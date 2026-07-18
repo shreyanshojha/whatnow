@@ -23,7 +23,7 @@ import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 export default function MoodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { mood, setMood, freeformDescription, setFreeformDescription, saved } = usePlan();
+  const { moods, toggleMood, setMood, freeformDescription, setFreeformDescription, saved } = usePlan();
   const [otherOpen, setOtherOpen] = React.useState(!!freeformDescription);
   const [draft, setDraft] = React.useState(freeformDescription);
   const [checkIn, setCheckIn] = React.useState<SavedEntry | null>(null);
@@ -51,7 +51,7 @@ export default function MoodScreen() {
   };
 
   const pick = (id: MoodId) => {
-    setMood(id);
+    toggleMood(id);
     setFreeformDescription(''); // a real mood tile always wins over stale freeform text
     setOtherOpen(false);
     setShowCrisisNotice(false); // switching to a normal mood tile clears any lingering notice
@@ -90,8 +90,10 @@ export default function MoodScreen() {
     proceedWithFreeform(text);
   };
 
-  const selectedWord =
-    mood && !freeformDescription ? MOODS.find((m) => m.id === mood)?.word : null;
+  const selectedWords =
+    moods.length > 0 && !freeformDescription
+      ? moods.map((id) => MOODS.find((m) => m.id === id)?.word).filter(Boolean)
+      : [];
 
   return (
     <View style={styles.root}>
@@ -140,12 +142,12 @@ export default function MoodScreen() {
         <Text style={styles.tagline}>Plans around your mood, not your calendar.</Text>
         <Text style={styles.h1}>How are you feeling right now?</Text>
         <Text style={styles.sub}>
-          Pick the one that fits. We'll build a small plan around it — no wrong answers.
+          Pick what fits — one or a few. No wrong answers.
         </Text>
 
         <View style={styles.grid}>
           {MOODS.map((m) => {
-            const active = m.id === mood;
+            const active = moods.includes(m.id);
             return (
               <Pressable
                 key={m.id}
@@ -249,9 +251,9 @@ export default function MoodScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
         {showCrisisNotice ? (
           <Text style={styles.footerHintFaint}>Take your time — no rush to continue</Text>
-        ) : selectedWord ? (
+        ) : selectedWords.length > 0 ? (
           <Text style={styles.footerHint}>
-            Feeling {selectedWord}. Let's tailor it.
+            Feeling {selectedWords.join(' + ')}. Let's tailor it.
           </Text>
         ) : otherOpen ? (
           <Text style={styles.footerHintFaint}>Tap "Use this" above to continue</Text>
@@ -259,13 +261,13 @@ export default function MoodScreen() {
           <Text style={styles.footerHintFaint}>Tap a mood to begin</Text>
         )}
         <Pressable
-          disabled={!mood}
+          disabled={moods.length === 0}
           onPress={() => router.push('/home/context')}
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.cta,
-            !mood && styles.ctaDisabled,
-            pressed && mood && styles.ctaPressed,
+            moods.length === 0 && styles.ctaDisabled,
+            pressed && moods.length > 0 && styles.ctaPressed,
           ]}
         >
           <View style={styles.ctaRow}>

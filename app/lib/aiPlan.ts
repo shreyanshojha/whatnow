@@ -125,6 +125,13 @@ function buildPrompt(
         `${input.weather.bad ? 'Lean indoor.' : input.weather.good ? 'Nice out — outdoor is welcome.' : ''}`
     );
   }
+  if (input.hour !== undefined && (input.hour >= 22 || input.hour < 6)) {
+    lines.push(
+      `It's late (around ${input.hour}:00 local time) — keep suggestions low-key and things ` +
+        `they can actually do right now. Skip anything that assumes a park, trail, or other ` +
+        `outdoor spot is open and lively at this hour.`
+    );
+  }
   if (nearbyName) {
     lines.push(`They're roughly in ${nearbyName}.`);
   }

@@ -106,8 +106,8 @@ export default function PlanScreen() {
         <View style={styles.cappedBadge}>
           <Icon name="info" size={13} color={colors.inkFaint} strokeWidth={1.8} />
           <Text style={styles.cappedBadgeText}>
-            You've reached today's shared AI limit for the beta — this plan is from WhatNow's
-            built-in matching instead. Resets tomorrow, or add your own API key in Settings.
+            You've hit today's shared AI limit — this plan uses WhatNow's built-in matching
+            instead. Resets tomorrow, or add your own key in Settings.
           </Text>
         </View>
       ) : null}
@@ -130,7 +130,7 @@ export default function PlanScreen() {
           <Text style={styles.emptyH}>That combination is a tight fit.</Text>
           <Text style={styles.emptyP}>
             Nothing matched every constraint at once. Try widening one thing — a bit more
-            time, a looser budget, or setting to Either.
+            time, a looser budget, or setting to Anywhere.
           </Text>
           <Pressable
             onPress={() => router.back()}
@@ -308,11 +308,21 @@ function LookOnlineNearby({
   onSearch: () => Promise<void>;
 }) {
   const [searched, setSearched] = React.useState(false);
+  // Purely a client-side view filter over whatever the search already
+  // returned — the search itself always asks for a balanced mix of both
+  // (see lib/nearbySearch.ts), this just lets someone narrow what they're
+  // looking at afterward without a second search or any backend change.
+  const [filter, setFilter] = React.useState<'all' | 'event' | 'movie'>('all');
 
   const handlePress = () => {
     setSearched(true);
+    setFilter('all');
     onSearch().catch(() => {});
   };
+
+  const visibleResults = results?.filter((r) => filter === 'all' || r.category === filter) ?? null;
+  const hasMovies = results?.some((r) => r.category === 'movie') ?? false;
+  const hasEvents = results?.some((r) => r.category === 'event') ?? false;
 
   return (
     <View style={styles.nearbySection}>
@@ -341,37 +351,56 @@ function LookOnlineNearby({
         </View>
       ) : !searched ? (
         <Text style={styles.lookHint}>
-          Finds unlisted local events and new movies playing nearby — things a
-          structured events API wouldn't know about.
+          Finds unlisted local events and new movies nearby — beyond what a structured API
+          would catch.
         </Text>
       ) : results === null ? (
         <Text style={styles.lookHint}>
           Couldn't find anything just now — try again in a bit.
         </Text>
       ) : (
-        results.map((r, i) => (
-          <Pressable
-            key={`${r.name}-${i}`}
-            style={styles.nearbyRow}
-            disabled={!r.url}
-            onPress={() => {
-              if (r.url) Linking.openURL(r.url).catch(() => {});
-            }}
-          >
-            <View style={styles.nearbyIconWrap}>
-              <Icon
-                name={r.category === 'movie' ? 'venue-cinema' : 'ticket'}
-                size={17}
-                color={colors.inkSoft}
-                strokeWidth={1.7}
-              />
+        <>
+          {hasMovies && hasEvents ? (
+            <View style={styles.lookFilterRow}>
+              {(['all', 'event', 'movie'] as const).map((f) => (
+                <Pressable
+                  key={f}
+                  onPress={() => setFilter(f)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: filter === f }}
+                  style={[styles.lookFilterChip, filter === f && styles.lookFilterChipActive]}
+                >
+                  <Text style={[styles.lookFilterText, filter === f && styles.lookFilterTextActive]}>
+                    {f === 'all' ? 'All' : f === 'event' ? 'Events' : 'Movies'}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.nearbyName}>{r.name}</Text>
-              <Text style={styles.nearbyMeta}>{r.blurb}</Text>
-            </View>
-          </Pressable>
-        ))
+          ) : null}
+          {visibleResults?.map((r, i) => (
+            <Pressable
+              key={`${r.name}-${i}`}
+              style={styles.nearbyRow}
+              disabled={!r.url}
+              onPress={() => {
+                if (r.url) Linking.openURL(r.url).catch(() => {});
+              }}
+            >
+              <View style={styles.nearbyIconWrap}>
+                <Icon
+                  name={r.category === 'movie' ? 'venue-cinema' : 'ticket'}
+                  size={17}
+                  color={colors.inkSoft}
+                  strokeWidth={1.7}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nearbyName}>{r.name}</Text>
+                <Text style={styles.nearbyMeta}>{r.blurb}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </>
       )}
     </View>
   );
@@ -456,6 +485,17 @@ const styles = StyleSheet.create({
   },
   lookBtnText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
   lookHint: { fontSize: 13, color: colors.inkFaint, ...font.regular, lineHeight: 19 },
+  lookFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  lookFilterChip: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  lookFilterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  lookFilterText: { fontSize: 12, ...font.semibold, color: colors.inkFaint },
+  lookFilterTextActive: { color: colors.white },
   nearbyRow: {
     flexDirection: 'row',
     alignItems: 'center',

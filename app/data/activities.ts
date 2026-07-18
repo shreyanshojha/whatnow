@@ -1,6 +1,6 @@
 /* ============================================================
    WhatNow — curated activity dataset (ported from web v1)
-   Deterministic, keyless. 111 activities tagged by mood-fit +
+   Deterministic, keyless. 117 activities tagged by mood-fit +
    reason, energy, time, social, indoor/outdoor, cost, category.
    ============================================================ */
 
@@ -26,7 +26,8 @@ export type CatId =
   | 'explore'
   | 'learn'
   | 'indulge'
-  | 'reset';
+  | 'reset'
+  | 'food';
 
 export type Energy = 'low' | 'medium' | 'high';
 export type Social = 'solo' | 'someone' | 'group';
@@ -163,6 +164,14 @@ export const CATS: Record<CatId, Category> = {
     tint: '#e9f3ef',
     fallback:
       'Resetting your space and your head clears just enough of the {mood} fog to see the next small step.',
+  },
+  food: {
+    label: 'Eat',
+    emo: '🍽️',
+    color: '#c1793d',
+    tint: '#f7ede1',
+    fallback:
+      'Sometimes the kindest answer to a {mood} moment is just to go get a genuinely good meal — no bigger plan required.',
   },
 };
 
@@ -443,4 +452,21 @@ export const ACTIVITIES: Activity[] = [
     why: { restless: 'A small treat with somewhere to sit and watch gives restless energy a reason to slow down for a minute.', bored: 'People-watching turns a boring ten minutes into low-key entertainment, snack included.' } },
   { id: 'try-a-new-to-you-sport-or-class-full-eff', t: "Try a new-to-you sport or class, full effort", d: "Climbing, spin, martial arts, anything you haven't tried. Show up and actually go hard.", cat: 'move', moods: ['curious', 'content', 'playful'], e: 'high', time: 60, soc: ['solo', 'someone', 'group'], place: 'either', cost: 'cheap', kidFriendly: true,
     why: { curious: "Full physical effort at something brand-new answers 'what's that like' in the most direct way possible.", content: "You've got the steadiness to try something hard and enjoy the effort itself, win or not.", playful: 'Throwing yourself into something new and physical is play in its most literal form.' } },
+
+  /* ---- food: going out to eat, not home comfort-eating (that's under
+     indulge) — these pair with real nearby restaurant/cafe/bar venues
+     from the location pipeline, see components/ActivityCard.tsx's
+     CAT_TO_AMENITY. ---- */
+  { id: 'try-a-restaurant-youve-never-been-to', t: "Try a restaurant you've never been to", d: 'Somewhere new nearby. Let the menu decide for you.', cat: 'food', moods: ['curious', 'bored', 'inspired', 'playful'], e: 'medium', time: 60, soc: ['solo', 'someone', 'group'], place: 'either', cost: 'treat', kidFriendly: true,
+    why: { curious: 'A menu you\'ve never read is a small, low-stakes adventure — easy curiosity to satisfy tonight.', bored: 'New food, new room, new people-watching — a quick, reliable reset from routine.', inspired: 'Trying somewhere unfamiliar matches the spark of wanting something different right now.' } },
+  { id: 'get-a-group-together-for-a-meal', t: 'Get a group together for a meal', d: 'Text a few people, pick a place, make it happen tonight.', cat: 'food', moods: ['lonely', 'playful', 'content'], e: 'medium', time: 240, soc: ['group'], place: 'either', cost: 'treat', kidFriendly: true,
+    why: { lonely: 'A table full of people you like is one of the fastest, most direct ways to feel less alone.', playful: 'Good food and good company is basically the whole plan — nothing else required.' } },
+  { id: 'find-a-food-truck-or-market-stall', t: 'Find a food truck or market stall', d: 'Something you can eat standing up, outside, in the sun.', cat: 'food', moods: ['restless', 'bored', 'curious'], e: 'medium', time: 60, soc: ['solo', 'someone', 'group'], place: 'outdoor', cost: 'cheap', kidFriendly: true,
+    why: { restless: 'Walking to go find food gives restless energy an actual destination.', bored: 'Street food has more novelty per bite than a sit-down menu ever does.' } },
+  { id: 'have-a-proper-sit-down-meal-solo', t: 'Have a proper sit-down meal, solo', d: 'A real table, a real menu, just you. No phone required, but allowed.', cat: 'food', moods: ['content', 'inspired', 'lonely'], e: 'low', time: 60, soc: ['solo'], place: 'either', cost: 'treat', kidFriendly: false,
+    why: { content: 'Treating yourself to a proper sit-down meal alone is a quiet vote of confidence in your own company.', lonely: 'Eating out solo, on purpose, can feel less like being alone and more like choosing yourself.' } },
+  { id: 'meet-someone-for-brunch-or-coffee', t: 'Meet someone for brunch or coffee', d: 'Pick one person. Pick a place. Just show up and talk.', cat: 'food', moods: ['lonely', 'content', 'low'], e: 'low', time: 60, soc: ['someone'], place: 'either', cost: 'cheap', kidFriendly: true,
+    why: { lonely: 'A shared meal gives connection an easy, built-in structure — you always have the food to talk about if nothing else.', low: 'Low-effort company over something easy to order can lift a low mood more than trying to fix it alone.' } },
+  { id: 'treat-yourself-to-dessert-out', t: 'Treat yourself to dessert, out', d: 'Ice cream, cake, whatever sounds good. No dinner required first.', cat: 'food', moods: ['playful', 'content', 'low'], e: 'low', time: 60, soc: ['solo', 'someone', 'group'], place: 'either', cost: 'cheap', kidFriendly: true,
+    why: { playful: 'Dessert without dinner first is a tiny, delightful rule to break on purpose.', low: 'Something sweet, out of the house, is a gentle nudge back toward feeling okay.' } },
 ];

@@ -49,6 +49,7 @@ const CAT_TO_AMENITY: Record<string, string[]> = {
   indulge: ['cafe', 'restaurant', 'bar'],
   connect: ['cafe', 'restaurant', 'bar', 'park'],
   create: ['cafe', 'bookstore'],
+  food: ['restaurant', 'bar', 'cafe'],
 };
 
 function formatDistance(m: number): string {

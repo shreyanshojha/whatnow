@@ -21,28 +21,28 @@ const SLIDES: Slide[] = [
     icons: ['inspired'],
     eyebrow: 'Welcome to WhatNow',
     title: "Plans around your mood, not your calendar.",
-    body: "Most apps ask what you're doing. WhatNow asks how you're feeling — restless, drained, curious, whatever it is right now — and starts there.",
+    body: "Most apps ask what you're doing. We ask how you're feeling — and start there.",
     tint: colors.glowPeach,
   },
   {
     icons: ['clock', 'social-group', 'budget-cheap'],
     eyebrow: 'A few quick taps',
     title: 'Add what’s true right now.',
-    body: "How much time you have, who you're with, indoor or out, what you'd spend — a handful of taps, not a questionnaire. WhatNow does the rest.",
+    body: "Time, company, indoor or out, budget — a few taps, not a questionnaire.",
     tint: colors.glowPink,
   },
   {
     icons: ['thumb-up', 'thumb-down', 'user'],
     eyebrow: 'It learns you',
     title: 'Tell it when a plan lands — or doesn’t.',
-    body: "A quick thumbs-up or down on any suggestion teaches WhatNow what actually works for you. Create an account and that learning follows you anywhere, so its very first guess keeps getting sharper.",
+    body: "Thumbs up or down teaches WhatNow what works for you. Sign in and it follows you to any device.",
     tint: colors.bg2,
   },
   {
     icons: ['venue-cinema', 'ticket', 'compass'],
     eyebrow: 'Beyond the built-in list',
     title: 'Real events and new movies, on demand.',
-    body: 'When you want more than the built-in ideas, "Look online nearby" searches the live web for what’s actually happening close to you — including things too new or niche for any events database.',
+    body: '"Look online nearby" searches the live web for events and new movies close to you — even things too new for any database.',
     tint: colors.glowPeach,
   },
 ];
@@ -54,7 +54,7 @@ export default function OnboardingScreen() {
   const [index, setIndex] = React.useState(0);
 
   const finish = React.useCallback(() => {
-    setCompletedOnboarding().finally(() => router.replace('/(tabs)'));
+    setCompletedOnboarding().finally(() => router.replace('/(tabs)/home'));
   }, [router]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {

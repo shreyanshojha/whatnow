@@ -1,8 +1,10 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import React from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -33,6 +35,8 @@ export default function AboutScreen() {
     sharedAiAvailable,
     eventsApiKey,
     setEventsApiKey,
+    yelpApiKey,
+    setYelpApiKey,
     clearLocationHistory,
     clearFeedback,
     aiPlansRemainingToday,
@@ -42,6 +46,8 @@ export default function AboutScreen() {
   const [savedFlash, setSavedFlash] = React.useState(false);
   const [eventsKeyDraft, setEventsKeyDraft] = React.useState(eventsApiKey);
   const [eventsSavedFlash, setEventsSavedFlash] = React.useState(false);
+  const [yelpKeyDraft, setYelpKeyDraft] = React.useState(yelpApiKey);
+  const [yelpSavedFlash, setYelpSavedFlash] = React.useState(false);
   const [historyCleared, setHistoryCleared] = React.useState(false);
   const [learningCleared, setLearningCleared] = React.useState(false);
 
@@ -52,6 +58,9 @@ export default function AboutScreen() {
   React.useEffect(() => {
     setEventsKeyDraft(eventsApiKey);
   }, [eventsApiKey]);
+  React.useEffect(() => {
+    setYelpKeyDraft(yelpApiKey);
+  }, [yelpApiKey]);
 
   const onSaveKey = () => {
     setAiApiKey(keyDraft);
@@ -63,6 +72,12 @@ export default function AboutScreen() {
     setEventsApiKey(eventsKeyDraft);
     setEventsSavedFlash(true);
     setTimeout(() => setEventsSavedFlash(false), 1800);
+  };
+
+  const onSaveYelpKey = () => {
+    setYelpApiKey(yelpKeyDraft);
+    setYelpSavedFlash(true);
+    setTimeout(() => setYelpSavedFlash(false), 1800);
   };
 
   const onClearHistory = () => {
@@ -87,7 +102,7 @@ export default function AboutScreen() {
   const onClearFeedback = () => {
     Alert.alert(
       'Clear learning history?',
-      "This forgets which activities WhatNow has noticed you tend to save or reshuffle away, so recommendations go back to neutral. It doesn't affect your saved list itself.",
+      "This forgets which activities you tend to save or skip, resetting recommendations to neutral. Your saved list is unaffected.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -115,10 +130,9 @@ export default function AboutScreen() {
       <Text style={styles.tagline}>Plans around your mood, not your calendar.</Text>
 
       <Text style={styles.p}>
-        Most planners start with your calendar. WhatNow starts with how you actually feel.
-        Tell it your mood and a few constraints, and it builds a small, tailored plan of{' '}
-        {ACTIVITIES.length} hand-written activities — each with a genuine reason it might
-        help right now.
+        Most planners start with your calendar. WhatNow starts with how you feel. Tell it
+        your mood and a few constraints, and get a tailored plan from {ACTIVITIES.length}{' '}
+        hand-written activities — each with a real reason it might help.
       </Text>
 
       <AccountCard />
@@ -137,21 +151,21 @@ export default function AboutScreen() {
           <Text style={styles.cardH}>Privacy</Text>
         </View>
         <Text style={styles.cardP}>
-          Signing in is optional — everything below still works without an account, using
-          only this device. If you do sign in, your saved activities, feedback
-          (thumbs-up/down, accepts, rejects), and plan history are stored on WhatNow's
-          servers, protected so only your signed-in account can ever read or write them —
-          purely to make the app's guesses better over time and let your history follow you
-          to another device. We don't sell it, share it with advertisers, or use it for
-          anything beyond running WhatNow. Delete your account any time above to permanently
-          erase all of it. Location is entirely separate and optional: each time you grant
-          it, WhatNow briefly checks the live weather (Open-Meteo) and nearby real places
-          (OpenStreetMap) to tailor that one plan — those coordinates go only to those
-          services, for that one lookup. Separately, WhatNow keeps a small neighborhood-level
-          pattern memory (never your exact GPS position) entirely on this device, never
-          uploaded anywhere. You can wipe either memory below any time, and deleting the app
-          removes them for good. Deny location and everything still works, just without the
-          location-aware tuning. Full details in PRIVACY.md.
+          Signing in is optional — everything below works fully on this device without an
+          account.{'\n\n'}
+          <Text style={font.semibold}>If you sign in: </Text>
+          your saved activities, feedback, and plan history sync to WhatNow's servers,
+          readable only by your account — just to sharpen your plans and follow you across
+          devices. Never sold, never shared with advertisers. Delete your account above to
+          erase it all.{'\n\n'}
+          <Text style={font.semibold}>Location (optional): </Text>
+          each time you grant it, WhatNow briefly checks live weather (Open-Meteo) and nearby
+          places (OpenStreetMap) for that one plan only — sent only to those services.{'\n\n'}
+          <Text style={font.semibold}>On-device memory: </Text>
+          WhatNow also keeps a neighborhood-level pattern memory (never exact GPS) locally,
+          never uploaded. Wipe either memory below anytime; deleting the app removes both for
+          good.{'\n\n'}
+          Full details in PRIVACY.md.
         </Text>
         <Pressable
           onPress={onClearHistory}
@@ -186,22 +200,17 @@ export default function AboutScreen() {
               />
             </View>
             <Text style={styles.cardP}>
+              WhatNow can ask an AI to compose a fresh plan for this moment, instead of picking
+              from the built-in list.{'\n\n'}
               {sharedAiAvailable
-                ? "During the beta, this works automatically for you — no key needed. Your plans " +
-                  "are composed by a shared key with a fair daily cap per person, so if you hit " +
-                  "it, WhatNow just uses its built-in matching engine until tomorrow, same as ever. "
+                ? 'During the beta this works automatically — no key needed, with a fair shared ' +
+                  'daily cap. Hit it, and WhatNow uses its built-in matching until tomorrow.\n\n'
                 : ''}
-              When it's on below, WhatNow asks an AI to compose a fresh plan for this exact moment
-              instead of picking from the built-in list{sharedAiAvailable ? ' using your own key instead of the shared one' : ''}.
-              Bring your own API key — it's stored only on this device (in the OS keychain) and sent
-              directly from your phone to the provider, never through a WhatNow server. If it's off,
-              the key is missing, or a request fails for any reason, WhatNow falls back to its
-              built-in matching engine instantly — you'll never see a broken plan. To keep any one
-              day's usage reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans
-              per day (resets at midnight) — after that, it simply uses the built-in engine until
-              tomorrow. The same key also powers the optional "Look online nearby" search on
-              your plan screen, which looks up real local events and new movies playing near
-              you — that's a separate, smaller daily cap, shown next to its own search button.
+              Bring your own key instead: stored only on this device, sent straight to the
+              provider, never through our servers. Off, missing, or failed? WhatNow falls back
+              to built-in matching instantly — no broken plans.{'\n\n'}
+              Capped at {MAX_AI_PLANS_PER_DAY} plans/day (resets at midnight). The same key also
+              powers "Look online nearby" on your plan screen, with its own smaller cap.
             </Text>
             <TextInput
               value={keyDraft}
@@ -252,12 +261,11 @@ export default function AboutScreen() {
       <View style={styles.card}>
         <Text style={styles.cardH}>Live nearby events (optional)</Text>
         <Text style={styles.cardP}>
-          Add a free Ticketmaster Discovery API key to see real concerts, shows, and games
-          happening near you in the "Nearby right now" section of your plan. Same
-          bring-your-own-key setup: stored on this device only, sent straight to
-          Ticketmaster. Without a key, you'll still see real nearby venues (parks, cafes,
-          and the like) from OpenStreetMap — just not ticketed events. Capped at{' '}
-          {MAX_EVENTS_LOOKUPS_PER_DAY} lookups a day, resetting at midnight.
+          Add free keys to see real events in "Nearby right now" — Ticketmaster for concerts,
+          shows, and games; Yelp for smaller local and community events. Either or both work on
+          their own. Both stay on this device, sent straight to their own provider. No keys?
+          You'll still see nearby venues from OpenStreetMap. Shares one cap of{' '}
+          {MAX_EVENTS_LOOKUPS_PER_DAY} lookups/day, resets at midnight.
         </Text>
         <TextInput
           value={eventsKeyDraft}
@@ -269,11 +277,6 @@ export default function AboutScreen() {
           autoCorrect={false}
           style={styles.keyInput}
         />
-        {eventsApiKey ? (
-          <Text style={styles.usageText}>
-            {eventsLookupsRemainingToday} of {MAX_EVENTS_LOOKUPS_PER_DAY} left today
-          </Text>
-        ) : null}
         <Pressable
           onPress={onSaveEventsKey}
           accessibilityRole="button"
@@ -281,8 +284,33 @@ export default function AboutScreen() {
           hitSlop={6}
           style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
         >
-          <FlashLabel flashed={eventsSavedFlash} flashedText="Saved" idleText="Save key" />
+          <FlashLabel flashed={eventsSavedFlash} flashedText="Saved" idleText="Save Ticketmaster key" />
         </Pressable>
+
+        <TextInput
+          value={yelpKeyDraft}
+          onChangeText={setYelpKeyDraft}
+          placeholder="Paste your Yelp API key"
+          placeholderTextColor={colors.inkFaint}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={[styles.keyInput, { marginTop: 12 }]}
+        />
+        <Pressable
+          onPress={onSaveYelpKey}
+          accessibilityRole="button"
+          accessibilityLabel="Save Yelp API key"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <FlashLabel flashed={yelpSavedFlash} flashedText="Saved" idleText="Save Yelp key" />
+        </Pressable>
+        {eventsApiKey || yelpApiKey ? (
+          <Text style={styles.usageText}>
+            {eventsLookupsRemainingToday} of {MAX_EVENTS_LOOKUPS_PER_DAY} left today
+          </Text>
+        ) : null}
       </View>
 
       <Text style={styles.credit}>
@@ -301,7 +329,16 @@ export default function AboutScreen() {
 }
 
 function AccountCard() {
-  const { user, initializing, signUpWithEmail, signInWithEmail, signOut, deleteAccount } = useAuth();
+  const {
+    user,
+    initializing,
+    signUpWithEmail,
+    signInWithEmail,
+    signInWithGoogle,
+    signInWithApple,
+    signOut,
+    deleteAccount,
+  } = useAuth();
   const [mode, setMode] = React.useState<'signIn' | 'signUp'>('signUp');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -312,6 +349,12 @@ function AccountCard() {
   const [deleteArmed, setDeleteArmed] = React.useState(false);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = React.useState(false);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   const onSubmit = async () => {
     setError(null);
@@ -334,6 +377,36 @@ function AccountCard() {
       } else {
         setPassword('');
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onGoogle = async () => {
+    setError(null);
+    if (mode === 'signUp' && !consented) {
+      setError('Please accept the privacy policy to create an account.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await signInWithGoogle(PRIVACY_POLICY_VERSION);
+      if (result.error) setError(result.error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onApple = async () => {
+    setError(null);
+    if (mode === 'signUp' && !consented) {
+      setError('Please accept the privacy policy to create an account.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await signInWithApple(PRIVACY_POLICY_VERSION);
+      if (result.error) setError(result.error);
     } finally {
       setBusy(false);
     }
@@ -425,9 +498,8 @@ function AccountCard() {
         <Text style={styles.cardH}>Account</Text>
       </View>
       <Text style={styles.cardP}>
-        Create an account so your saved activities and what WhatNow learns about you follow
-        you across devices — this is what lets the app's first guess get better over time,
-        not just within one session.
+        Create an account so your saved activities and learning follow you across devices —
+        and your very first guess gets better over time.
       </Text>
 
       <View style={styles.acctModeRow}>
@@ -528,6 +600,36 @@ function AccountCard() {
           </>
         )}
       </Pressable>
+
+      <View style={styles.acctDividerRow}>
+        <View style={styles.acctDividerLine} />
+        <Text style={styles.acctDividerText}>or</Text>
+        <View style={styles.acctDividerLine} />
+      </View>
+
+      <Pressable
+        onPress={onGoogle}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={mode === 'signUp' ? 'Create account with Google' : 'Sign in with Google'}
+        style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.85 }]}
+      >
+        <Text style={styles.socialBtnText}>Continue with Google</Text>
+      </Pressable>
+
+      {appleAvailable ? (
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={
+            mode === 'signUp'
+              ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+              : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+          }
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={radius.md}
+          style={styles.appleBtn}
+          onPress={onApple}
+        />
+      ) : null}
 
       <Text style={styles.acctSkipNote}>
         You can skip this — WhatNow still works fully on this device. Signing in is what lets
@@ -819,6 +921,22 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   acctSubmitText: { fontSize: 15, ...font.bold, color: colors.white },
+  acctDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, marginBottom: 12 },
+  acctDividerLine: { flex: 1, height: 1, backgroundColor: colors.line },
+  acctDividerText: { fontSize: 12, color: colors.inkFaint, ...font.semibold },
+  socialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  socialBtnText: { fontSize: 14.5, ...font.semibold, color: colors.ink },
+  appleBtn: { width: '100%', height: 46, marginBottom: 10 },
   acctSkipNote: { fontSize: 12.5, color: colors.inkFaint, marginTop: 12, lineHeight: 18 },
   acctBtn: {
     flexDirection: 'row',

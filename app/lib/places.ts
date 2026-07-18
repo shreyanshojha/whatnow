@@ -54,8 +54,15 @@ async function reverseGeocode(lat: number, lon: number): Promise<string | null> 
     const data = await res.json();
     const a = data && data.address;
     if (!a) return null;
+    // `neighbourhood`/`quarter` are OSM's finest-grained, most locally
+    // recognizable labels (e.g. "Nob Hill", "Russian Hill"). `suburb` is
+    // often a much coarser or even mistagged administrative area in dense
+    // cities — verified against Russian Hill, SF coordinates returning
+    // quarter: "Nob Hill" (correct-ish, adjacent) vs. suburb: "South of
+    // Market" (a genuinely different, non-adjacent-feeling neighborhood).
+    // Prefer the precise fields first.
     const local =
-      a.suburb || a.neighbourhood || a.quarter || a.village || a.town || a.city_district;
+      a.neighbourhood || a.quarter || a.suburb || a.village || a.town || a.city_district;
     const city = a.city || a.town || a.municipality || a.state;
     if (local && city && local !== city) return `${local}, ${city}`;
     return local || city || (data.name as string) || null;
@@ -139,49 +146,69 @@ function kindOf(tags: Record<string, string>): string | null {
   return null;
 }
 
-/** One Overpass query covering every venue kind WhatNow cares about, nearest-first. */
-async function nearbyVenues(lat: number, lon: number, radius: number = 1500): Promise<NearbyVenue[]> {
+// Split into a few smaller queries run in parallel rather than one big
+// union query. A single query covering all 9 amenity kinds reliably hit
+// Overpass's own server-side timeout (504, ~8-9s) in dense urban areas —
+// confirmed against Russian Hill, SF, which has enough of each amenity
+// kind within 1500m that the combined scan never finished. Each smaller
+// group finishes fast enough on its own; running them in parallel keeps
+// total wall time close to the slowest single group, not the sum of all.
+// Each entry is a ready-to-use Overpass node-filter fragment (minus the
+// `(around:...)` clause, added per-request below).
+const AMENITY_QUERY_GROUPS: string[][] = [
+  [`node["leisure"="park"]`, `node["amenity"="cafe"]`],
+  [`node["amenity"="restaurant"]`, `node["amenity"~"^(bar|pub)$"]`],
+  [`node["amenity"="library"]`, `node["leisure"="fitness_centre"]`],
+  [`node["tourism"="museum"]`, `node["shop"="books"]`, `node["amenity"="cinema"]`],
+];
+
+async function fetchVenueGroup(
+  nodeFilters: string[],
+  lat: number,
+  lon: number,
+  radius: number
+): Promise<any[]> {
   try {
-    const q =
-      `[out:json][timeout:10];(` +
-      `node["leisure"="park"](around:${radius},${lat},${lon});` +
-      `node["amenity"="cafe"](around:${radius},${lat},${lon});` +
-      `node["amenity"="library"](around:${radius},${lat},${lon});` +
-      `node["leisure"="fitness_centre"](around:${radius},${lat},${lon});` +
-      `node["amenity"="restaurant"](around:${radius},${lat},${lon});` +
-      `node["amenity"~"^(bar|pub)$"](around:${radius},${lat},${lon});` +
-      `node["tourism"="museum"](around:${radius},${lat},${lon});` +
-      `node["shop"="books"](around:${radius},${lat},${lon});` +
-      `node["amenity"="cinema"](around:${radius},${lat},${lon});` +
-      `);out center 60;`;
+    const clauses = nodeFilters.map((f) => `${f}(around:${radius},${lat},${lon});`).join('');
+    const q = `[out:json][timeout:12];(${clauses});out center 60;`;
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q);
-    const res = await timedFetch(url, 10000);
+    const res = await timedFetch(url, 12000);
     if (!res.ok) throw new Error('overpass http ' + res.status);
     const data = await res.json();
-    const els: any[] = (data && data.elements) || [];
-
-    const seen = new Set<string>();
-    const venues: NearbyVenue[] = [];
-    for (const el of els) {
-      if (!el.tags || !el.tags.name) continue;
-      const kind = kindOf(el.tags);
-      if (!kind) continue;
-      const name = el.tags.name as string;
-      if (seen.has(name)) continue; // OSM often has duplicate nodes for the same spot
-      seen.add(name);
-      const elLat = el.lat ?? el.center?.lat;
-      const elLon = el.lon ?? el.center?.lon;
-      const distanceM =
-        typeof elLat === 'number' && typeof elLon === 'number'
-          ? Math.round(distanceMeters(lat, lon, elLat, elLon))
-          : radius;
-      venues.push({ name, kind, distanceM });
-    }
-    venues.sort((a, b) => a.distanceM - b.distanceM);
-    return venues.slice(0, 8);
+    return (data && data.elements) || [];
   } catch {
     return [];
   }
+}
+
+/** Real nearby venues across every kind WhatNow cares about, nearest-first.
+ * Runs a handful of smaller Overpass queries in parallel instead of one big
+ * one — see AMENITY_QUERY_GROUPS above for why. */
+async function nearbyVenues(lat: number, lon: number, radius: number = 1500): Promise<NearbyVenue[]> {
+  const groups = await Promise.all(
+    AMENITY_QUERY_GROUPS.map((g) => fetchVenueGroup(g, lat, lon, radius))
+  );
+  const els = groups.flat();
+
+  const seen = new Set<string>();
+  const venues: NearbyVenue[] = [];
+  for (const el of els) {
+    if (!el.tags || !el.tags.name) continue;
+    const kind = kindOf(el.tags);
+    if (!kind) continue;
+    const name = el.tags.name as string;
+    if (seen.has(name)) continue; // OSM often has duplicate nodes for the same spot
+    seen.add(name);
+    const elLat = el.lat ?? el.center?.lat;
+    const elLon = el.lon ?? el.center?.lon;
+    const distanceM =
+      typeof elLat === 'number' && typeof elLon === 'number'
+        ? Math.round(distanceMeters(lat, lon, elLat, elLon))
+        : radius;
+    venues.push({ name, kind, distanceM });
+  }
+  venues.sort((a, b) => a.distanceM - b.distanceM);
+  return venues.slice(0, 8);
 }
 
 export async function fetchNearby(lat: number, lon: number, radius: number = 1500): Promise<NearbyPlace> {

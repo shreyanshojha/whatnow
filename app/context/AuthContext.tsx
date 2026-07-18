@@ -16,8 +16,18 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { SUPABASE_URL, supabase } from '../lib/supabase';
+
+// Lets the OAuth browser flow (Google) hand control back to the app instead
+// of leaving the browser tab open after redirecting — recommended by both
+// Expo's and Supabase's own docs for this exact pattern.
+WebBrowser.maybeCompleteAuthSession();
 
 /** Bump this whenever PRIVACY.md changes meaningfully — recorded against the
  * account the moment consent is captured, so we always know which version of
@@ -54,6 +64,18 @@ interface AuthContextValue {
     inviteCode?: string
   ) => Promise<AuthResult>;
   signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
+  /** Opens a browser-based Google OAuth flow via Supabase, then hands the
+   * resulting session back the same way email sign-in does. Requires the
+   * Google provider to be enabled (with a real OAuth client id/secret) in
+   * the Supabase dashboard first — see NEXT_STEPS.md. */
+  signInWithGoogle: (acceptedPrivacyVersion: string) => Promise<AuthResult>;
+  /** Native "Sign in with Apple" (not a web redirect) — required by Apple's
+   * own guidelines whenever another social sign-in is offered. iOS only;
+   * callers should check `Platform.OS === 'ios'` before showing this as an
+   * option at all. Requires the "Sign in with Apple" capability enabled in
+   * Xcode/the Apple Developer portal (a paid Developer account) and the
+   * Apple provider enabled in Supabase — see NEXT_STEPS.md. */
+  signInWithApple: (acceptedPrivacyVersion: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   /** Calls the delete-account Edge Function (see supabase/functions),
    * which verifies the caller's own JWT server-side before deleting the
@@ -185,6 +207,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error ? friendlyAuthError(error.message) : null };
   };
 
+  const signInWithGoogle = async (acceptedPrivacyVersion: string): Promise<AuthResult> => {
+    try {
+      // WhatNow's own custom scheme (see app.json's "scheme") — Google
+      // redirects back to this URL once the person approves the sign-in,
+      // and WebBrowser hands control back to the app right there.
+      const redirectTo = Linking.createURL('auth-callback');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error || !data?.url) return { error: friendlyAuthError(error?.message ?? 'Could not start Google sign-in.') };
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type !== 'success' || !result.url) {
+        // Cancelled by the person — not a real error, don't show one.
+        return { error: null };
+      }
+
+      // Supabase's JS client defaults to the PKCE flow, so the redirect
+      // comes back as a normal "?code=..." query param (not a "#access_
+      // token=..." URL fragment) — Linking.parse only reads query params,
+      // which lines up with that. exchangeCodeForSession does the rest.
+      const { queryParams } = Linking.parse(result.url);
+      const authError = queryParams?.error_description ?? queryParams?.error;
+      if (authError) return { error: friendlyAuthError(String(authError)) };
+      const code = queryParams?.code as string | undefined;
+      if (!code) {
+        return { error: 'Google sign-in finished, but no session came back — try again.' };
+      }
+      const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeErr) return { error: friendlyAuthError(exchangeErr.message) };
+      await writeConsent(acceptedPrivacyVersion);
+      return { error: null };
+    } catch {
+      return { error: "Couldn't reach Google — check your connection and try again." };
+    }
+  };
+
+  const signInWithApple = async (acceptedPrivacyVersion: string): Promise<AuthResult> => {
+    if (Platform.OS !== 'ios') return { error: 'Sign in with Apple is only available on iOS.' };
+    try {
+      // A random nonce, hashed with SHA-256 before being sent to Apple —
+      // Apple returns it unhashed inside the identity token, and Supabase
+      // verifies it matches on its end. Standard Sign in with Apple +
+      // Supabase pairing, not WhatNow-specific.
+      const rawNonce = Crypto.randomUUID();
+      const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+      if (!credential.identityToken) {
+        return { error: "Apple didn't return a usable sign-in — try again." };
+      }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+        nonce: rawNonce,
+      });
+      if (error) return { error: friendlyAuthError(error.message) };
+      await writeConsent(acceptedPrivacyVersion);
+      return { error: null };
+    } catch (e: any) {
+      // Apple's own SDK throws a specific code when the person cancels —
+      // treat that as a silent no-op, not an error banner.
+      if (e?.code === 'ERR_REQUEST_CANCELED') return { error: null };
+      return { error: "Couldn't complete Apple sign-in — try again." };
+    }
+  };
+
   const signOut = async (): Promise<void> => {
     await supabase.auth.signOut();
   };
@@ -215,6 +311,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializing,
     signUpWithEmail,
     signInWithEmail,
+    signInWithGoogle,
+    signInWithApple,
     signOut,
     deleteAccount,
   };

@@ -8,6 +8,7 @@ import {
   ACTIVITIES,
   Activity,
   CATS,
+  CatId,
   COST,
   E,
   Energy,
@@ -47,6 +48,43 @@ export interface PlanInput {
    * the bucket label when AI planning is on. Undefined for the normal
    * pick-a-mood-tile flow. */
   freeform?: string;
+  /** Local clock hour, 0–23, at the moment the plan is generated (see
+   * PlanContext's makePlan — always `new Date().getHours()`, never
+   * user-set). Used only to keep outdoor suggestions from showing up in
+   * the middle of the night, when most outdoor spots are closed or empty
+   * anyway — framed as "keeping it low-key this late," not a safety
+   * lecture. Optional so existing callers/tests that don't care about
+   * time-of-day keep working unchanged. */
+  hour?: number;
+  /** Local day of week, 0 (Sunday)–6 (Saturday), at the moment the plan is
+   * generated (see PlanContext's makePlan — always `new Date().getDay()`).
+   * A soft scoring nudge only (see baseScore) — never a hard filter, since
+   * WhatNow has no idea what anyone's actual weekday schedule looks like.
+   * Optional so existing callers/tests keep working unchanged. */
+  dayOfWeek?: number;
+  /** Extra moods picked alongside the primary `mood` on the mood-picker
+   * screen's multi-select grid. Each is a softer scoring bonus than the
+   * primary (see baseScore) — blends them into one plan instead of letting
+   * any one of them fully dominate category diversity. Optional; omitted
+   * for the common single-mood case, so every existing caller/test that
+   * only sets `mood` keeps working unchanged. */
+  secondaryMoods?: MoodId[];
+  /** Optional "what kind of thing" filter (see CATS) — when non-empty, only
+   * activities in one of these categories are considered at all. Undefined
+   * or empty means no filtering, same as today. */
+  categories?: CatId[];
+}
+
+function isWeekend(dayOfWeek: number): boolean {
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+/** 10pm–6am: quiet hours where an outdoor suggestion (a park, a trail, a
+ * bike ride) is more likely to be a dead end than a good idea — not a
+ * judgment call about the person, just what's actually open and lively
+ * at that hour. */
+function isQuietHours(hour: number): boolean {
+  return hour >= 22 || hour < 6;
 }
 
 function passesConstraints(a: Activity, input: PlanInput): boolean {
@@ -63,6 +101,15 @@ function passesConstraints(a: Activity, input: PlanInput): boolean {
   if (COST[a.cost] > COST[input.budget]) return false;
   // Energy: never suggest something two steps above the user's energy
   if (E[a.e] - E[input.energy] >= 2) return false;
+  // Quiet hours: skip anything that requires being outdoors specifically
+  // (activities tagged 'either' are unaffected — plenty of them work fine
+  // as an indoor substitute).
+  if (input.hour !== undefined && isQuietHours(input.hour) && a.place === 'outdoor') return false;
+  // "What kind of thing" filter: only applied when someone has actually
+  // picked one or more categories — an empty/undefined list means no
+  // narrowing at all, same as before this filter existed.
+  if (input.categories && input.categories.length > 0 && !input.categories.includes(a.cat))
+    return false;
   return true;
 }
 
@@ -70,6 +117,13 @@ function baseScore(a: Activity, input: PlanInput): number {
   let s = 10;
   // Mood fit is the heart of it
   if (a.moods.includes(input.mood)) s += 45;
+  // Any additional moods picked alongside the primary one get a real say,
+  // just a smaller one — the primary mood still leads.
+  if (input.secondaryMoods) {
+    for (const m of input.secondaryMoods) {
+      if (m !== input.mood && a.moods.includes(m)) s += 18;
+    }
+  }
   // Energy closeness
   const ediff = Math.abs(E[a.e] - E[input.energy]);
   s += ediff === 0 ? 16 : ediff === 1 ? 5 : -10;
@@ -81,6 +135,26 @@ function baseScore(a: Activity, input: PlanInput): number {
     if (input.weather.bad && a.place === 'outdoor') s -= 30;
     if (input.weather.bad && a.place === 'indoor') s += 6;
     if (input.weather.good && a.place === 'outdoor') s += 10;
+  }
+  // Quiet-hours bias: lean toward wind-down activities late at night,
+  // same spirit as the weather bias above — a nudge, not a hard rule
+  // (hard outdoor exclusion is handled in passesConstraints).
+  if (input.hour !== undefined && isQuietHours(input.hour)) {
+    if (a.cat === 'rest') s += 8;
+    if (a.e === 'high') s -= 6;
+  }
+  // Day-of-week bias: a light nudge, not a schedule assumption — WhatNow
+  // has no idea if someone works weekends or is off on a Tuesday. Weekends
+  // lean toward things that take longer or involve other people (more
+  // likely to have the time/company for them); nothing is excluded either
+  // way, and a strong mood/energy fit still wins over this easily.
+  if (input.dayOfWeek !== undefined) {
+    if (isWeekend(input.dayOfWeek)) {
+      if (a.time >= 60) s += 4;
+      if (a.soc.includes('group') && a.cat !== 'rest') s += 3;
+    } else {
+      if (a.time === 15) s += 3;
+    }
   }
   return s;
 }

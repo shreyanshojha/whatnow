@@ -228,6 +228,20 @@ function draw(name: IconName, s: StrokeProps, color: string) {
           <Path {...s} d="M19.8 4v4.4h-4.4" />
         </>
       );
+    case 'food':
+      // Same fork-and-knife mark as 'venue-restaurant', rescaled to this
+      // icon set's 24x24/centered convention — kept visually consistent
+      // rather than inventing a second food glyph.
+      return (
+        <>
+          <Line {...s} x1="8" y1="3" x2="8" y2="10.5" />
+          <Line {...s} x1="10.5" y1="3" x2="10.5" y2="10.5" />
+          <Path {...s} d="M8 10.5a1.25 1.25 0 0 0 2.5 0" />
+          <Line {...s} x1="9.25" y1="10.5" x2="9.25" y2="21" />
+          <Line {...s} x1="16.5" y1="3" x2="15.25" y2="12" />
+          <Line {...s} x1="16.5" y1="3" x2="16.5" y2="21" />
+        </>
+      );
 
     // ---------------- Place ----------------
     case 'indoor':

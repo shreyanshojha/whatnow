@@ -18,12 +18,11 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { ACTIVITIES, Activity, Energy, MoodId, Place, Social, TimeVal } from '../data/activities';
+import { ACTIVITIES, Activity, CatId, Energy, MoodId, Place, Social, TimeVal } from '../data/activities';
 import { useAuth } from './AuthContext';
 import { generateAiPlan } from '../lib/aiPlan';
 import { SHARED_BETA_AI_ENABLED } from '../lib/betaConfig';
 import { cancelCompletionNotification, scheduleCompletionNotification } from '../lib/completionCheck';
-import { fetchNearbyEvents, LiveEvent } from '../lib/events';
 import {
   clearFeedback,
   getFeedbackWeights,
@@ -31,6 +30,7 @@ import {
   recordRejected,
   recordShown,
 } from '../lib/feedback';
+import { fetchNearbyEvents, fetchYelpEvents, LiveEvent } from '../lib/events';
 import { addLocationVisit, clearLocationHistory, getPatternHint } from '../lib/locationHistory';
 import { NearbyResult, searchNearby } from '../lib/nearbySearch';
 import { generatePlan, PlanInput, WeatherState } from '../lib/plan';
@@ -45,9 +45,11 @@ import {
   loadAiApiKey,
   loadAiEnabled,
   loadEventsApiKey,
+  loadYelpApiKey,
   saveAiApiKey,
   saveAiEnabled,
   saveEventsApiKey,
+  saveYelpApiKey,
 } from '../lib/secureSettings';
 import {
   MAX_AI_PLANS_PER_DAY,
@@ -111,7 +113,17 @@ interface StoredContext {
 
 interface PlanContextValue {
   // inputs
+  /** The primary mood — always `moods[0]`, kept as its own field since most
+   * of the app (feedback learning, saved-entry snapshots, the "why this
+   * helps" copy) only ever needs to key off one. */
   mood: MoodId | null;
+  /** Every mood picked on the mood grid, in tap order. Almost always length
+   * 1; can be up to MAX_MOODS (see the mood screen) when someone selects
+   * more than one — the engine blends them, weighted toward the first. */
+  moods: MoodId[];
+  /** Optional "what kind of thing" filter (see CATS in data/activities.ts) —
+   * empty means no narrowing, exactly like before this existed. */
+  categories: CatId[];
   energy: Energy;
   time: TimeVal;
   social: Social;
@@ -122,7 +134,14 @@ interface PlanContextValue {
   // instead of picking a listed mood. See lib/moodMatch.ts for how it still
   // gets bucketed into a real MoodId for the engine/feedback log underneath.
   freeformDescription: string;
+  /** Replaces the whole mood selection with a single mood — used by the
+   * freeform-text path (matchMoodFromText) where multi-select doesn't apply. */
   setMood: (m: MoodId) => void;
+  /** Adds/removes one mood from the multi-select grid (capped — see
+   * PlanContext's MAX_MOODS). This is what the mood-grid tiles call. */
+  toggleMood: (m: MoodId) => void;
+  /** Adds/removes one category from the "what kind of thing" filter. */
+  toggleCategory: (c: CatId) => void;
   setEnergy: (e: Energy) => void;
   setTime: (t: TimeVal) => void;
   setSocial: (s: Social) => void;
@@ -171,9 +190,12 @@ interface PlanContextValue {
    * instead" rather than a plan that's silently indistinguishable from any
    * other fallback. Reset at the start of every subsequent attempt. */
   sharedAiCapped: boolean;
-  // Live nearby events (optional, bring-your-own-key)
+  // Live nearby events (optional, bring-your-own-key) — two independent
+  // sources, either or both can be set (see lib/events.ts).
   eventsApiKey: string;
   setEventsApiKey: (key: string) => void;
+  yelpApiKey: string;
+  setYelpApiKey: (key: string) => void;
   // On-device-only location pattern memory (see lib/locationHistory.ts)
   clearLocationHistory: () => void;
   // On-device-only accept/reject learning log (see lib/feedback.ts)
@@ -195,7 +217,24 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   // backend — see lib/betaConfig.ts. A BYOK key, once set and enabled,
   // always takes precedence over the shared path.
   const sharedAiAvailable = SHARED_BETA_AI_ENABLED && !!user && !!session?.access_token;
-  const [mood, setMood] = useState<MoodId | null>(null);
+  // Up to 3 moods can be picked at once on the mood grid — enough to say
+  // "restless and a little lonely" without diluting the primary mood's
+  // pull on scoring (see lib/plan.ts's baseScore).
+  const MAX_MOODS = 3;
+  const [moods, setMoods] = useState<MoodId[]>([]);
+  const mood = moods[0] ?? null;
+  const [categories, setCategories] = useState<CatId[]>([]);
+  const setMood = useCallback((m: MoodId) => setMoods([m]), []);
+  const toggleMood = useCallback((m: MoodId) => {
+    setMoods((prev) => {
+      if (prev.includes(m)) return prev.filter((x) => x !== m);
+      if (prev.length >= MAX_MOODS) return prev; // silently capped, not an error state
+      return [...prev, m];
+    });
+  }, []);
+  const toggleCategory = useCallback((c: CatId) => {
+    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  }, []);
   const [energy, setEnergy] = useState<Energy>('medium');
   const [time, setTime] = useState<TimeVal>(60);
   const [social, setSocial] = useState<Social>('solo');
@@ -221,6 +260,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [aiEnabled, setAiEnabledState] = useState(false);
   const [aiApiKey, setAiApiKeyState] = useState('');
   const [eventsApiKey, setEventsApiKeyState] = useState('');
+  const [yelpApiKey, setYelpApiKeyState] = useState('');
 
   const [aiPlansRemainingToday, setAiPlansRemainingToday] = useState(MAX_AI_PLANS_PER_DAY);
   const [eventsLookupsRemainingToday, setEventsLookupsRemainingToday] = useState(
@@ -317,14 +357,16 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   // ---- Rehydrate AI + events settings ----
   useEffect(() => {
     (async () => {
-      const [enabled, key, eventsKey] = await Promise.all([
+      const [enabled, key, eventsKey, yelpKey] = await Promise.all([
         loadAiEnabled(),
         loadAiApiKey(),
         loadEventsApiKey(),
+        loadYelpApiKey(),
       ]);
       setAiEnabledState(enabled);
       setAiApiKeyState(key);
       setEventsApiKeyState(eventsKey);
+      setYelpApiKeyState(yelpKey);
     })();
   }, []);
 
@@ -341,6 +383,11 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const setEventsApiKey = useCallback((key: string) => {
     setEventsApiKeyState(key);
     saveEventsApiKey(key);
+  }, []);
+
+  const setYelpApiKey = useCallback((key: string) => {
+    setYelpApiKeyState(key);
+    saveYelpApiKey(key);
   }, []);
 
   const persistSaved = useCallback((entries: SavedEntry[]) => {
@@ -377,6 +424,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     if (!mood) return null;
     return {
       mood,
+      secondaryMoods: moods.length > 1 ? moods.slice(1) : undefined,
+      categories: categories.length > 0 ? categories : undefined,
       energy,
       time,
       social,
@@ -386,7 +435,19 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       withKids,
       freeform: freeformDescription || undefined,
     };
-  }, [mood, energy, time, social, setting, budget, weather, withKids, freeformDescription]);
+  }, [
+    mood,
+    moods,
+    categories,
+    energy,
+    time,
+    social,
+    setting,
+    budget,
+    weather,
+    withKids,
+    freeformDescription,
+  ]);
 
   /** Bounded wait: if a location request just kicked off, give it a moment
    * to land so the plan can use it — but never block plan generation for
@@ -407,6 +468,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
       const input: PlanInput = {
         mood,
+        secondaryMoods: moods.length > 1 ? moods.slice(1) : undefined,
+        categories: categories.length > 0 ? categories : undefined,
         energy,
         time,
         social,
@@ -415,6 +478,12 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         weather: weatherRef.current,
         withKids,
         freeform: freeformDescription || undefined,
+        // Always the real current hour/day, never something the person
+        // sets — see PlanInput.hour/dayOfWeek in lib/plan.ts for what these
+        // do (keeps outdoor suggestions from showing up at 3am, and lightly
+        // biases weekends vs. weekdays).
+        hour: new Date().getHours(),
+        dayOfWeek: new Date().getDay(),
       };
       setPlanLoading(true);
       try {
@@ -479,6 +548,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     },
     [
       mood,
+      moods,
+      categories,
       energy,
       time,
       social,
@@ -570,13 +641,28 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       // On-device only — nothing here ever leaves the phone. See lib/locationHistory.ts.
       if (mood) addLocationVisit(mood, n?.placeName ?? null).catch(() => {});
 
-      // Live events are their own optional, bring-your-own-key layer.
-      if (eventsApiKey && (await canUseEventsLookupToday())) {
+      // Live events are their own optional, bring-your-own-key layer —
+      // Ticketmaster and Yelp are independent sources (see lib/events.ts),
+      // either or both can be configured. One shared daily cap covers a
+      // single "look up nearby events" attempt regardless of how many
+      // sources it actually queries.
+      if ((eventsApiKey || yelpApiKey) && (await canUseEventsLookupToday())) {
         setEventsLoading(true);
-        fetchNearbyEvents(lat, lon, eventsApiKey)
-          .then((events) => {
-            setNearbyEvents(events);
-            if (events.length > 0) {
+        Promise.all([
+          eventsApiKey ? fetchNearbyEvents(lat, lon, eventsApiKey) : Promise.resolve<LiveEvent[]>([]),
+          yelpApiKey ? fetchYelpEvents(lat, lon, yelpApiKey) : Promise.resolve<LiveEvent[]>([]),
+        ])
+          .then(([ticketmasterEvents, yelpEvents]) => {
+            // Interleaved, not concatenated — so a full page from one
+            // source doesn't bury the other one entirely when both are on.
+            const merged: LiveEvent[] = [];
+            const max = Math.max(ticketmasterEvents.length, yelpEvents.length);
+            for (let i = 0; i < max; i++) {
+              if (ticketmasterEvents[i]) merged.push(ticketmasterEvents[i]);
+              if (yelpEvents[i]) merged.push(yelpEvents[i]);
+            }
+            setNearbyEvents(merged);
+            if (merged.length > 0) {
               recordEventsLookupUse().then(refreshUsageCounts);
             }
           })
@@ -584,7 +670,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           .finally(() => setEventsLoading(false));
       }
     },
-    [eventsApiKey, mood, refreshUsageCounts]
+    [eventsApiKey, yelpApiKey, mood, refreshUsageCounts]
   );
 
   const requestLocation = useCallback((): Promise<void> => {
@@ -603,9 +689,25 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           setLocationStatus('denied');
           return;
         }
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-        });
+        // `Low` accuracy is allowed to answer from cell-tower/WiFi
+        // positioning instead of GPS, which can be off by kilometers —
+        // exactly wrong for "what's nearby." `High` forces GPS-grade
+        // accuracy (~10m), which is what a radius-based nearby search
+        // actually needs. It costs a bit more time/battery per request,
+        // which is fine here since this only runs once per plan.
+        let pos;
+        try {
+          pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+        } catch {
+          // Rare devices/simulators can fail to produce a High-accuracy fix
+          // at all (no GPS hardware, indoors with poor signal, etc.) — fall
+          // back to Balanced rather than failing the whole request outright.
+          pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        }
         const { latitude, longitude } = pos.coords;
         await applyResolvedLocation(latitude, longitude, 1500);
       } catch {
@@ -709,7 +811,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
    * Saved activities, location, and AI/events settings are untouched — those
    * aren't part of "this one plan attempt." */
   const resetFlow = useCallback(() => {
-    setMood(null);
+    setMoods([]);
+    setCategories([]);
     setEnergy('medium');
     setTime(60);
     setSocial('solo');
@@ -725,6 +828,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   const value: PlanContextValue = {
     mood,
+    moods,
+    categories,
     energy,
     time,
     social,
@@ -733,6 +838,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     withKids,
     freeformDescription,
     setMood,
+    toggleMood,
+    toggleCategory,
     setEnergy,
     setTime,
     setSocial,
@@ -768,6 +875,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     sharedAiCapped,
     eventsApiKey,
     setEventsApiKey,
+    yelpApiKey,
+    setYelpApiKey,
     clearLocationHistory,
     clearFeedback,
     resetFlow,
