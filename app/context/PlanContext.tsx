@@ -21,6 +21,7 @@ import React, {
 import { ACTIVITIES, Activity, Energy, MoodId, Place, Social, TimeVal } from '../data/activities';
 import { useAuth } from './AuthContext';
 import { generateAiPlan } from '../lib/aiPlan';
+import { cancelCompletionNotification, scheduleCompletionNotification } from '../lib/completionCheck';
 import { fetchNearbyEvents, LiveEvent } from '../lib/events';
 import {
   clearFeedback,
@@ -581,11 +582,14 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSave = useCallback(
     (activity: Activity) => {
+      const savedMood = mood ?? activity.moods[0];
+      let savedAt = 0;
       setSaved((prev) => {
         const exists = prev.some((s) => s.activity.id === activity.id);
+        savedAt = Date.now();
         const next = exists
           ? prev.filter((s) => s.activity.id !== activity.id)
-          : [...prev, { activity, mood: mood ?? activity.moods[0], savedAt: Date.now() }];
+          : [...prev, { activity, mood: savedMood, savedAt }];
         persistSaved(next);
         return next;
       });
@@ -594,10 +598,14 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       // unrelated to "I didn't like this").
       const alreadySaved = savedRef.current.some((s) => s.activity.id === activity.id);
       if (!alreadySaved) {
-        recordAccepted(activity.id, mood ?? activity.moods[0]).catch(() => {});
-        syncSaveActivity(activity, mood ?? activity.moods[0]).catch(() => {});
+        recordAccepted(activity.id, savedMood).catch(() => {});
+        syncSaveActivity(activity, savedMood).catch(() => {});
+        // A courtesy local nudge in case this person never reopens the app
+        // on their own — see lib/completionCheck.ts. Never blocks the save.
+        scheduleCompletionNotification({ activity, mood: savedMood, savedAt }).catch(() => {});
       } else {
         syncUnsaveActivity(activity.id).catch(() => {});
+        cancelCompletionNotification(activity.id).catch(() => {});
       }
     },
     [persistSaved, mood]

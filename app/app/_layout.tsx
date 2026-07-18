@@ -11,6 +11,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
+import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +25,19 @@ import { hasCompletedOnboarding } from '../lib/onboarding';
 // and Inter are core to WhatNow's identity now, not a nice-to-have, so we
 // never want a flash of the system font before they load.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Show the completion check-in nudge (lib/completionCheck.ts) as a normal
+// banner even if it fires while the app is already open in the foreground —
+// otherwise a locally-scheduled notification silently does nothing while
+// the app happens to be active.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({

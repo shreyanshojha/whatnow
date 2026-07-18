@@ -3,25 +3,43 @@
 
    A first, deliberately small step toward tracking whether a
    suggestion actually helped, not just whether it was shown or
-   saved. No push notifications, no server round-trip: the next
-   time the app is opened after a save that's had a plausible
-   chance to happen, a small dismissible card asks "did this
-   happen, did it help?" The answer is logged as an explicit
-   thumbs-up/down (see lib/feedback.ts) — it's the same underlying
+   saved. The in-app card (shown the next time the mood screen is
+   open, 3 hours to 5 days after a save — see getPendingCompletionCheck
+   below) covers anyone who naturally reopens the app in that window.
+
+   That alone misses someone who saves something and never opens
+   the app again on their own — so a local, on-device scheduled
+   notification (no server, no push infrastructure) is fired a few
+   hours after each save as a nudge back in. This is genuinely just
+   a local alarm, not a remote push: the content and timing are
+   both fully known at save time, so there's nothing a server would
+   add — which is why this doesn't need Expo push tokens, APNs/FCM
+   credentials, or a server dispatch job to close the gap.
+
+   The answer, whichever way someone gets to it, is logged as an
+   explicit thumbs-up/down (see lib/feedback.ts) — the same underlying
    signal, just captured later and with real-world context instead
    of an in-the-moment reaction.
    ============================================================ */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { SavedEntry } from '../context/PlanContext';
 
 const ASKED_KEY = 'whatnow.completionAsked.v1';
+const NOTIF_IDS_KEY = 'whatnow.completionNotifIds.v1';
 
 // A save needs to be at least this old before we ask — otherwise "did this
 // happen?" would be asked before there's been any real chance to do it.
 const MIN_AGE_MS = 3 * 60 * 60 * 1000; // 3 hours
 // And not so old the question feels random and disconnected from anything.
 const MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+
+// How long after a save the local nudge notification fires — comfortably
+// past MIN_AGE_MS so it's never asking too early, but same-day so it still
+// feels connected to the save rather than random.
+const NOTIFY_DELAY_SECONDS = 5 * 60 * 60; // 5 hours
 
 async function readAsked(): Promise<Set<string>> {
   try {
@@ -68,4 +86,85 @@ export async function dismissCompletionCheck(activityId: string): Promise<void> 
   const asked = await readAsked();
   asked.add(activityId);
   await writeAsked(asked);
+}
+
+async function readNotifIds(): Promise<Record<string, string>> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIF_IDS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeNotifIds(ids: Record<string, string>): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIF_IDS_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore — worst case a stale notification fires or fails to cancel
+  }
+}
+
+/** Requests notification permission if it hasn't been decided yet. Never
+ * throws, never blocks — if the person denies or this fails for any
+ * reason, the app just falls back to the in-app-only check-in. Safe to
+ * call as often as needed; only actually prompts once per OS rules. */
+async function ensurePermission(): Promise<boolean> {
+  if (Platform.OS === 'web') return false; // no local notifications on web
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted) return true;
+    if (!current.canAskAgain) return false;
+    const requested = await Notifications.requestPermissionsAsync();
+    return !!requested.granted;
+  } catch {
+    return false;
+  }
+}
+
+/** Schedules the one-time local nudge for a freshly saved activity. A pure
+ * courtesy on top of the in-app card — if permission isn't granted, or
+ * scheduling fails for any reason, saving still works exactly as before. */
+export async function scheduleCompletionNotification(entry: SavedEntry): Promise<void> {
+  try {
+    const granted = await ensurePermission();
+    if (!granted) return;
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Quick check-in',
+        body: `Last time, you saved "${entry.activity.t}" — did it end up happening?`,
+        data: { activityId: entry.activity.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: NOTIFY_DELAY_SECONDS,
+      },
+    });
+
+    const ids = await readNotifIds();
+    ids[entry.activity.id] = id;
+    await writeNotifIds(ids);
+  } catch {
+    // ignore — the in-app card (getPendingCompletionCheck) still covers this
+    // activity on the next natural app open regardless
+  }
+}
+
+/** Cancels a not-yet-fired nudge — call when an activity is unsaved, so
+ * someone who changes their mind doesn't get asked about something they
+ * decided against. Safe to call even if nothing was ever scheduled. */
+export async function cancelCompletionNotification(activityId: string): Promise<void> {
+  try {
+    const ids = await readNotifIds();
+    const id = ids[activityId];
+    if (!id) return;
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    delete ids[activityId];
+    await writeNotifIds(ids);
+  } catch {
+    // ignore — worst case a stale notification still fires once
+  }
 }
