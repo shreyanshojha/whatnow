@@ -17,6 +17,7 @@ import { Icon } from '../../components/Icon';
 import { PRIVACY_POLICY_VERSION, useAuth } from '../../context/AuthContext';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
+import { SHOW_BYOK_AI_UI } from '../../lib/betaConfig';
 import { getPersonalStats, PersonalStats } from '../../lib/feedback';
 import { fetchReferralInfo } from '../../lib/sync';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
@@ -173,59 +174,79 @@ export default function AboutScreen() {
       </View>
 
       <View style={styles.card}>
-        <View style={styles.aiHeaderRow}>
-          <Text style={styles.cardH}>AI planning (optional)</Text>
-          <Switch
-            value={aiEnabled}
-            onValueChange={setAiEnabled}
-            trackColor={{ false: colors.line, true: colors.coral }}
-            thumbColor={colors.white}
-          />
-        </View>
-        <Text style={styles.cardP}>
-          {sharedAiAvailable
-            ? "During the beta, this works automatically for you — no key needed. Your plans " +
-              "are composed by a shared key with a fair daily cap per person, so if you hit " +
-              "it, WhatNow just uses its built-in matching engine until tomorrow, same as ever. "
-            : ''}
-          When it's on below, WhatNow asks an AI to compose a fresh plan for this exact moment
-          instead of picking from the built-in list{sharedAiAvailable ? ' using your own key instead of the shared one' : ''}.
-          Bring your own API key — it's stored only on this device (in the OS keychain) and sent
-          directly from your phone to the provider, never through a WhatNow server. If it's off,
-          the key is missing, or a request fails for any reason, WhatNow falls back to its
-          built-in matching engine instantly — you'll never see a broken plan. To keep any one
-          day's usage reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans
-          per day (resets at midnight) — after that, it simply uses the built-in engine until
-          tomorrow. The same key also powers the optional "Look online nearby" search on
-          your plan screen, which looks up real local events and new movies playing near
-          you — that's a separate, smaller daily cap, shown next to its own search button.
-        </Text>
-        <TextInput
-          value={keyDraft}
-          onChangeText={setKeyDraft}
-          placeholder="Paste your Anthropic API key"
-          placeholderTextColor={colors.inkFaint}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.keyInput}
-        />
-        <View style={styles.keyFooterRow}>
-          <Pressable
-            onPress={onSaveKey}
-            accessibilityRole="button"
-            accessibilityLabel="Save AI API key"
-            hitSlop={6}
-            style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
-          >
-            <FlashLabel flashed={savedFlash} flashedText="Saved" idleText="Save key" />
-          </Pressable>
-          {aiEnabled && aiApiKey ? (
-            <Text style={styles.usageText}>
-              {aiPlansRemainingToday} of {MAX_AI_PLANS_PER_DAY} left today
+        {SHOW_BYOK_AI_UI ? (
+          <>
+            <View style={styles.aiHeaderRow}>
+              <Text style={styles.cardH}>AI planning (optional)</Text>
+              <Switch
+                value={aiEnabled}
+                onValueChange={setAiEnabled}
+                trackColor={{ false: colors.line, true: colors.coral }}
+                thumbColor={colors.white}
+              />
+            </View>
+            <Text style={styles.cardP}>
+              {sharedAiAvailable
+                ? "During the beta, this works automatically for you — no key needed. Your plans " +
+                  "are composed by a shared key with a fair daily cap per person, so if you hit " +
+                  "it, WhatNow just uses its built-in matching engine until tomorrow, same as ever. "
+                : ''}
+              When it's on below, WhatNow asks an AI to compose a fresh plan for this exact moment
+              instead of picking from the built-in list{sharedAiAvailable ? ' using your own key instead of the shared one' : ''}.
+              Bring your own API key — it's stored only on this device (in the OS keychain) and sent
+              directly from your phone to the provider, never through a WhatNow server. If it's off,
+              the key is missing, or a request fails for any reason, WhatNow falls back to its
+              built-in matching engine instantly — you'll never see a broken plan. To keep any one
+              day's usage reasonable, WhatNow caps itself at {MAX_AI_PLANS_PER_DAY} AI-composed plans
+              per day (resets at midnight) — after that, it simply uses the built-in engine until
+              tomorrow. The same key also powers the optional "Look online nearby" search on
+              your plan screen, which looks up real local events and new movies playing near
+              you — that's a separate, smaller daily cap, shown next to its own search button.
             </Text>
-          ) : null}
-        </View>
+            <TextInput
+              value={keyDraft}
+              onChangeText={setKeyDraft}
+              placeholder="Paste your Anthropic API key"
+              placeholderTextColor={colors.inkFaint}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.keyInput}
+            />
+            <View style={styles.keyFooterRow}>
+              <Pressable
+                onPress={onSaveKey}
+                accessibilityRole="button"
+                accessibilityLabel="Save AI API key"
+                hitSlop={6}
+                style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+              >
+                <FlashLabel flashed={savedFlash} flashedText="Saved" idleText="Save key" />
+              </Pressable>
+              {aiEnabled && aiApiKey ? (
+                <Text style={styles.usageText}>
+                  {aiPlansRemainingToday} of {MAX_AI_PLANS_PER_DAY} left today
+                </Text>
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.aiHeaderRow}>
+              <Text style={styles.cardH}>AI planning</Text>
+              <Icon name="inspired" size={18} color={colors.plum} strokeWidth={1.8} />
+            </View>
+            <Text style={styles.cardP}>
+              {sharedAiAvailable
+                ? "Working automatically for you during the beta — no setup needed. Plans are " +
+                  "composed by a shared key with a fair daily cap per person; if you ever hit it, " +
+                  "WhatNow just uses its built-in matching engine until tomorrow, same as always. " +
+                  "The same access also powers \"Look online nearby\" on your plan screen."
+                : "Sign in to get AI-composed plans automatically during the beta — no key or " +
+                  "setup required. Until then, WhatNow uses its built-in matching engine."}
+            </Text>
+          </>
+        )}
       </View>
 
       <View style={styles.card}>

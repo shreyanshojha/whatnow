@@ -19,3 +19,13 @@
    ============================================================ */
 
 export const SHARED_BETA_AI_ENABLED = true;
+
+/** Whether the About screen shows the "bring your own key" switch/input/save
+ * button for AI planning. Kept in the codebase (not deleted) for whenever
+ * BYOK becomes relevant again — after the beta, or for someone who wants a
+ * higher personal limit — but hidden for now per Shreyansh's request for a
+ * simpler flow: everyone signed in already gets AI planning automatically
+ * via the shared key, so a second, more complicated way to get the same
+ * thing is just clutter during the beta. Flip back to true to restore it;
+ * no other code changes needed. */
+export const SHOW_BYOK_AI_UI = false;
