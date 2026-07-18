@@ -53,6 +53,12 @@ each time you do, two things happen:
    for that plan. Same as above: your coordinates go to OpenStreetMap for this one lookup,
    with no identifying information attached.
 
+If you'd rather not share GPS location, "Search a place instead" lets you type a city or area
+by name — the text you type is sent to the same OpenStreetMap service (Nominatim) to look up
+its coordinates, which are then used exactly like GPS coordinates would be for the weather and
+nearby-places checks above. Nothing about this differs from GPS location in terms of where the
+data goes or how long it's kept; it's just a typed starting point instead of your device's GPS.
+
 Separately, WhatNow keeps a small **on-device-only** pattern memory: a rolling log of
 roughly neighborhood-level locations (never exact GPS) paired with the mood you were feeling
 at the time. This never leaves your device and is never uploaded anywhere, signed in or not.

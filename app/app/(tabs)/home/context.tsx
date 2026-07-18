@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,7 @@ import { Icon } from '../../../components/Icon';
 import { Segmented } from '../../../components/Segmented';
 import { usePlan } from '../../../context/PlanContext';
 import { MOODS } from '../../../data/activities';
+import { PlaceCandidate, SearchRadius, searchPlace } from '../../../lib/places';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 import { weatherIconName, weatherNote } from '../../../lib/weather';
 
@@ -37,11 +39,48 @@ export default function ContextScreen() {
     nearby,
     locationStatus,
     requestLocation,
+    setManualLocation,
     makePlan,
     freeformDescription,
   } = usePlan();
 
   const moodMeta = MOODS.find((m) => m.id === mood);
+
+  // "Search a place instead" — for anyone who'd rather type a city/area than
+  // share GPS (denied it, doesn't want to, or just wants a different place
+  // than where they physically are right now). See lib/places.ts's
+  // searchPlace + PlanContext's setManualLocation.
+  const [manualOpen, setManualOpen] = React.useState(false);
+  const [manualQuery, setManualQuery] = React.useState('');
+  const [manualRadius, setManualRadius] = React.useState<SearchRadius>('medium');
+  const [manualCandidates, setManualCandidates] = React.useState<PlaceCandidate[] | null>(null);
+  const [manualSearching, setManualSearching] = React.useState(false);
+  const [manualApplying, setManualApplying] = React.useState(false);
+
+  const onManualSearch = async () => {
+    const q = manualQuery.trim();
+    if (!q) return;
+    setManualSearching(true);
+    setManualCandidates(null);
+    try {
+      const results = await searchPlace(q);
+      setManualCandidates(results);
+    } finally {
+      setManualSearching(false);
+    }
+  };
+
+  const onPickCandidate = async (c: PlaceCandidate) => {
+    setManualApplying(true);
+    try {
+      await setManualLocation(c.lat, c.lon, manualRadius);
+      setManualOpen(false);
+      setManualCandidates(null);
+      setManualQuery('');
+    } finally {
+      setManualApplying(false);
+    }
+  };
 
   const onMakePlan = () => {
     // Fire the plan request and navigate immediately — the Plan screen
@@ -181,19 +220,96 @@ export default function ContextScreen() {
               <Text style={styles.weatherPlace}>{nearby.placeName}</Text>
             </View>
           ) : null}
-          {!weather && locationStatus !== 'denied' ? (
-            <Pressable
-              onPress={requestLocation}
-              disabled={locationStatus === 'loading'}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.weatherBtn, pressed && { opacity: 0.7 }]}
-            >
-              {locationStatus === 'loading' ? (
-                <ActivityIndicator color={colors.coralDeep} size="small" />
-              ) : (
-                <Text style={styles.weatherBtnText}>Use my location</Text>
-              )}
-            </Pressable>
+          {!weather ? (
+            <View style={styles.weatherBtnRow}>
+              {locationStatus !== 'denied' ? (
+                <Pressable
+                  onPress={requestLocation}
+                  disabled={locationStatus === 'loading'}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.weatherBtn, pressed && { opacity: 0.7 }]}
+                >
+                  {locationStatus === 'loading' ? (
+                    <ActivityIndicator color={colors.coralDeep} size="small" />
+                  ) : (
+                    <Text style={styles.weatherBtnText}>Use my location</Text>
+                  )}
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => setManualOpen((v) => !v)}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.weatherBtnGhost, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.weatherBtnGhostText}>Search a place instead</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {manualOpen ? (
+            <View style={styles.manualBox}>
+              <View style={styles.manualSearchRow}>
+                <TextInput
+                  value={manualQuery}
+                  onChangeText={setManualQuery}
+                  placeholder="City or area, e.g. Brooklyn, NY"
+                  placeholderTextColor={colors.inkFaint}
+                  style={styles.manualInput}
+                  onSubmitEditing={onManualSearch}
+                  returnKeyType="search"
+                />
+                <Pressable
+                  onPress={onManualSearch}
+                  disabled={!manualQuery.trim() || manualSearching}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.manualSearchBtn,
+                    (!manualQuery.trim() || manualSearching) && styles.ctaDisabledGhost,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  {manualSearching ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Icon name="curious" size={16} color={colors.white} strokeWidth={2} />
+                  )}
+                </Pressable>
+              </View>
+
+              <Segmented
+                label="How far to look"
+                value={manualRadius}
+                onChange={setManualRadius}
+                options={[
+                  { val: 'close', label: 'Close by', ic: 'pin' },
+                  { val: 'medium', label: 'Nearby', ic: 'pin' },
+                  { val: 'far', label: 'Willing to travel', ic: 'pin' },
+                ]}
+              />
+
+              {manualCandidates && manualCandidates.length === 0 ? (
+                <Text style={styles.manualHint}>
+                  Couldn't find that place — try a nearby bigger city or a different spelling.
+                </Text>
+              ) : manualCandidates ? (
+                <View style={styles.manualResults}>
+                  {manualCandidates.map((c) => (
+                    <Pressable
+                      key={`${c.lat}-${c.lon}`}
+                      onPress={() => onPickCandidate(c)}
+                      disabled={manualApplying}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.manualResultRow, pressed && { opacity: 0.7 }]}
+                    >
+                      <Icon name="pin" size={14} color={colors.inkSoft} strokeWidth={1.8} />
+                      <Text style={styles.manualResultText} numberOfLines={2}>
+                        {c.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
           ) : null}
         </View>
       </ScrollView>
@@ -289,6 +405,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   weatherBtnText: { fontSize: 14.5, ...font.semibold, color: colors.coralDeep },
+  weatherBtnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  weatherBtnGhost: {
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  weatherBtnGhostText: {
+    fontSize: 14.5,
+    ...font.semibold,
+    color: colors.inkSoft,
+    textDecorationLine: 'underline',
+  },
+  manualBox: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  manualSearchRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  manualInput: {
+    flex: 1,
+    backgroundColor: colors.bg2,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    fontSize: 14.5,
+    color: colors.ink,
+    ...font.regular,
+  },
+  manualSearchBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaDisabledGhost: { backgroundColor: colors.line },
+  manualHint: { fontSize: 13, color: colors.inkFaint, ...font.regular, lineHeight: 19, marginTop: 4 },
+  manualResults: { marginTop: 6, gap: 2 },
+  manualResultRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  manualResultText: { flex: 1, fontSize: 13.5, color: colors.ink, ...font.medium, lineHeight: 19 },
   footer: {
     position: 'absolute',
     left: 0,

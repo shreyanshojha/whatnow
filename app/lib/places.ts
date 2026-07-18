@@ -1,6 +1,10 @@
 /* ============================================================
    WhatNow — OpenStreetMap helpers (free, no key).
    - Nominatim reverse-geocode for a friendly place name.
+   - Nominatim forward-geocode (searchPlace) for someone who'd rather
+     type a city/area than share GPS location — see PlanContext's
+     setManualLocation and the "Search a place instead" flow on the
+     context screen.
    - Overpass API for real nearby venues: one gets folded into a
      tip on a matching activity card, the fuller list powers the
      "Nearby right now" section on the Plan screen.
@@ -60,6 +64,54 @@ async function reverseGeocode(lat: number, lon: number): Promise<string | null> 
   }
 }
 
+export interface PlaceCandidate {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+/** Forward geocode: turn a typed place name (a city, neighborhood, landmark)
+ * into coordinates, for someone who'd rather search than share GPS location.
+ * Returns up to 5 candidates since a name like "Springfield" is ambiguous —
+ * the UI shows these as a pick list rather than guessing the first result. */
+export async function searchPlace(query: string): Promise<PlaceCandidate[]> {
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=` + encodeURIComponent(q);
+    const res = await timedFetch(url, 9000);
+    if (!res.ok) throw new Error('nominatim http ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    const seen = new Set<string>();
+    const out: PlaceCandidate[] = [];
+    for (const d of data as any[]) {
+      const lat = parseFloat(d?.lat);
+      const lon = parseFloat(d?.lon);
+      const name = typeof d?.display_name === 'string' ? d.display_name : null;
+      if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      out.push({ name, lat, lon });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export type SearchRadius = 'close' | 'medium' | 'far';
+/** How far the "nearby real venues" lookup casts its net. Tied to a manual
+ * place search rather than a persistent global setting — someone picking a
+ * city off a map is the moment "close by vs. willing to travel" is actually
+ * on their mind. GPS location keeps the original fixed 1,500m default. */
+export const RADIUS_METERS: Record<SearchRadius, number> = {
+  close: 800,
+  medium: 1500,
+  far: 4000,
+};
+
 const AMENITY_KINDS = ['park', 'cafe', 'library', 'gym', 'restaurant', 'bar', 'museum', 'bookstore', 'cinema'] as const;
 
 /** Haversine distance in meters — good enough for a rough "how close" sort. */
@@ -88,9 +140,8 @@ function kindOf(tags: Record<string, string>): string | null {
 }
 
 /** One Overpass query covering every venue kind WhatNow cares about, nearest-first. */
-async function nearbyVenues(lat: number, lon: number): Promise<NearbyVenue[]> {
+async function nearbyVenues(lat: number, lon: number, radius: number = 1500): Promise<NearbyVenue[]> {
   try {
-    const radius = 1500;
     const q =
       `[out:json][timeout:10];(` +
       `node["leisure"="park"](around:${radius},${lat},${lon});` +
@@ -133,13 +184,16 @@ async function nearbyVenues(lat: number, lon: number): Promise<NearbyVenue[]> {
   }
 }
 
-export async function fetchNearby(lat: number, lon: number): Promise<NearbyPlace> {
-  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+export async function fetchNearby(lat: number, lon: number, radius: number = 1500): Promise<NearbyPlace> {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)},${radius}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return hit.value;
 
   // Run both, but never let one failure sink the other.
-  const [placeName, venues] = await Promise.all([reverseGeocode(lat, lon), nearbyVenues(lat, lon)]);
+  const [placeName, venues] = await Promise.all([
+    reverseGeocode(lat, lon),
+    nearbyVenues(lat, lon, radius),
+  ]);
   const pick =
     venues.length > 0 ? venues[Math.floor(Math.random() * Math.min(venues.length, 3))] : null;
   const amenity = pick ? { name: pick.name, kind: pick.kind } : null;

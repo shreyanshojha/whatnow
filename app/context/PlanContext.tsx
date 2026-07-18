@@ -34,7 +34,7 @@ import {
 import { addLocationVisit, clearLocationHistory, getPatternHint } from '../lib/locationHistory';
 import { NearbyResult, searchNearby } from '../lib/nearbySearch';
 import { generatePlan, PlanInput, WeatherState } from '../lib/plan';
-import { NearbyPlace, fetchNearby } from '../lib/places';
+import { NearbyPlace, RADIUS_METERS, SearchRadius, fetchNearby } from '../lib/places';
 import {
   fetchSyncedSavedActivities,
   syncPlanEvent,
@@ -135,6 +135,8 @@ interface PlanContextValue {
   nearby: NearbyPlace | null;
   locationStatus: LocationStatus;
   requestLocation: () => Promise<void>;
+  /** For someone who'd rather type a place than share GPS — see lib/places.ts. */
+  setManualLocation: (lat: number, lon: number, radius: SearchRadius) => Promise<void>;
   nearbyEvents: LiveEvent[];
   eventsLoading: boolean;
   // "Look online nearby" web search (optional, bring-your-own-key — same key as AI planning)
@@ -533,6 +535,37 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     }
   }, [aiApiKey, sharedAiAvailable, session, refreshUsageCounts]);
 
+  /** Shared by both the GPS path (requestLocation) and the manual-place path
+   * (setManualLocation) below — everything that happens once we have *some*
+   * coordinates, regardless of how we got them. Never throws; the caller
+   * decides what locationStatus to fall back to if this itself fails. */
+  const applyResolvedLocation = useCallback(
+    async (lat: number, lon: number, radiusMeters: number): Promise<void> => {
+      // Both are independent + individually wrapped; never throw here.
+      const [w, n] = await Promise.all([fetchWeather(lat, lon), fetchNearby(lat, lon, radiusMeters)]);
+      if (w) setWeather(w);
+      if (n) setNearby(n);
+      setLocationStatus('granted');
+      // On-device only — nothing here ever leaves the phone. See lib/locationHistory.ts.
+      if (mood) addLocationVisit(mood, n?.placeName ?? null).catch(() => {});
+
+      // Live events are their own optional, bring-your-own-key layer.
+      if (eventsApiKey && (await canUseEventsLookupToday())) {
+        setEventsLoading(true);
+        fetchNearbyEvents(lat, lon, eventsApiKey)
+          .then((events) => {
+            setNearbyEvents(events);
+            if (events.length > 0) {
+              recordEventsLookupUse().then(refreshUsageCounts);
+            }
+          })
+          .catch(() => setNearbyEvents([]))
+          .finally(() => setEventsLoading(false));
+      }
+    },
+    [eventsApiKey, mood, refreshUsageCounts]
+  );
+
   const requestLocation = useCallback((): Promise<void> => {
     // Registered in locationPromiseRef so makePlan can wait for this exact
     // in-flight request instead of racing it — see awaitPendingLocation above.
@@ -553,30 +586,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           accuracy: Location.Accuracy.Low,
         });
         const { latitude, longitude } = pos.coords;
-        // Both are independent + individually wrapped; never throw here.
-        const [w, n] = await Promise.all([
-          fetchWeather(latitude, longitude),
-          fetchNearby(latitude, longitude),
-        ]);
-        if (w) setWeather(w);
-        if (n) setNearby(n);
-        setLocationStatus('granted');
-        // On-device only — nothing here ever leaves the phone. See lib/locationHistory.ts.
-        if (mood) addLocationVisit(mood, n?.placeName ?? null).catch(() => {});
-
-        // Live events are their own optional, bring-your-own-key layer.
-        if (eventsApiKey && (await canUseEventsLookupToday())) {
-          setEventsLoading(true);
-          fetchNearbyEvents(latitude, longitude, eventsApiKey)
-            .then((events) => {
-              setNearbyEvents(events);
-              if (events.length > 0) {
-                recordEventsLookupUse().then(refreshUsageCounts);
-              }
-            })
-            .catch(() => setNearbyEvents([]))
-            .finally(() => setEventsLoading(false));
-        }
+        await applyResolvedLocation(latitude, longitude, 1500);
       } catch {
         setLocationStatus('unavailable');
       }
@@ -587,7 +597,23 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       if (locationPromiseRef.current === p) locationPromiseRef.current = null;
     });
     return p;
-  }, [eventsApiKey, mood, refreshUsageCounts]);
+  }, [applyResolvedLocation]);
+
+  /** For someone who'd rather type a place than share GPS (denied location,
+   * doesn't want to, or just wants a different area than where they are) —
+   * see lib/places.ts's searchPlace for the search itself and the "Search a
+   * place instead" flow on the context screen for the UI. */
+  const setManualLocation = useCallback(
+    async (lat: number, lon: number, radius: SearchRadius): Promise<void> => {
+      setLocationStatus('loading');
+      try {
+        await applyResolvedLocation(lat, lon, RADIUS_METERS[radius]);
+      } catch {
+        setLocationStatus('unavailable');
+      }
+    },
+    [applyResolvedLocation]
+  );
 
   // Kept in a ref (not just the `saved` state) so reshuffle's reject-recording
   // logic — defined earlier in this file, before isSaved exists as a value —
@@ -678,6 +704,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     nearby,
     locationStatus,
     requestLocation,
+    setManualLocation,
     nearbyEvents,
     eventsLoading,
     nearbySearchResults,
