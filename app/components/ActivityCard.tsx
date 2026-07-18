@@ -5,11 +5,12 @@ import {
   Activity,
   CATS,
   COST_LABEL,
+  MOODS,
   MoodId,
   PLACE_LABEL,
   TIME_LABEL,
 } from '../data/activities';
-import { recordExplicitFeedback } from '../lib/feedback';
+import { getPersonalSignal, personalizationNote, recordExplicitFeedback } from '../lib/feedback';
 import { whyFor } from '../lib/plan';
 import { NearbyPlace } from '../lib/places';
 import { colors, font, fontDisplay, radius, shadow } from '../lib/theme';
@@ -60,6 +61,22 @@ export function ActivityCard({
   const anim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const [given, setGiven] = useState<'up' | 'down' | null>(null);
+  const [personalNote, setPersonalNote] = useState<string | null>(null);
+
+  // An honest, auditable "why this, for you" line — only ever shown when
+  // there's real feedback history behind it (see lib/feedback.ts). This is
+  // deliberately distinct from the mood-based "why this helps" copy below,
+  // which is the same for everyone feeling this mood; this one is earned.
+  useEffect(() => {
+    let cancelled = false;
+    const moodWord = MOODS.find((m) => m.id === mood)?.word ?? mood;
+    getPersonalSignal(a.id, mood).then((signal) => {
+      if (!cancelled) setPersonalNote(personalizationNote(signal, moodWord));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [a.id, mood]);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -159,6 +176,13 @@ export function ActivityCard({
 
       <Text style={styles.title}>{a.t}</Text>
       <Text style={styles.desc}>{a.d}</Text>
+
+      {personalNote ? (
+        <View style={styles.personalRow}>
+          <Icon name="thumb-up" size={12} color={colors.sage} strokeWidth={2} />
+          <Text style={styles.personalText}>{personalNote}</Text>
+        </View>
+      ) : null}
 
       <View style={[styles.why, { backgroundColor: cat.tint }]}>
         <Text style={[styles.whyLabel, { color: cat.color }]}>
@@ -265,6 +289,8 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   desc: { fontSize: 15, color: colors.inkSoft, ...font.regular, lineHeight: 21, marginBottom: 14 },
+  personalRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -6, marginBottom: 14 },
+  personalText: { flex: 1, fontSize: 12.5, ...font.semibold, color: colors.sage },
   why: { borderRadius: radius.md, padding: 13, marginBottom: 12 },
   whyLabel: {
     fontSize: 11,

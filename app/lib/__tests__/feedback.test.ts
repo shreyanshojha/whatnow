@@ -8,6 +8,8 @@
 import {
   clearFeedback,
   getFeedbackWeights,
+  getPersonalSignal,
+  personalizationNote,
   recordAccepted,
   recordExplicitFeedback,
   recordRejected,
@@ -106,5 +108,47 @@ describe('getFeedbackWeights', () => {
     await recordExplicitFeedback('hike', 'restless', false);
     const w = await getFeedbackWeights('restless');
     expect(w.get('hike')).toBeUndefined(); // net zero -> no weight stored
+  });
+});
+
+describe('getPersonalSignal + personalizationNote', () => {
+  it('returns an all-zero signal and no note for an activity with no history', async () => {
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(signal).toEqual({ thumbsUp: 0, thumbsDown: 0, accepted: 0, rejected: 0 });
+    expect(personalizationNote(signal, 'restless')).toBeNull();
+  });
+
+  it('only counts events matching both the activity id and the mood', async () => {
+    await recordExplicitFeedback('hike', 'restless', true);
+    await recordExplicitFeedback('hike', 'drained', true); // different mood
+    await recordExplicitFeedback('read', 'restless', true); // different activity
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(signal.thumbsUp).toBe(1);
+  });
+
+  it('produces a note after a single thumbs-up', async () => {
+    await recordExplicitFeedback('hike', 'restless', true);
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(personalizationNote(signal, 'restless')).toMatch(/good call/i);
+  });
+
+  it('produces a stronger note after repeated thumbs-up', async () => {
+    await recordExplicitFeedback('hike', 'restless', true);
+    await recordExplicitFeedback('hike', 'restless', true);
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(personalizationNote(signal, 'restless')).toMatch(/confirmed/i);
+  });
+
+  it('produces a note from a save alone, with no thumbs-up', async () => {
+    await recordAccepted('hike', 'restless');
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(personalizationNote(signal, 'restless')).toMatch(/saved/i);
+  });
+
+  it('says nothing when a thumbs-down is the strongest signal', async () => {
+    await recordAccepted('hike', 'restless');
+    await recordExplicitFeedback('hike', 'restless', false);
+    const signal = await getPersonalSignal('hike', 'restless');
+    expect(personalizationNote(signal, 'restless')).toBeNull();
   });
 });

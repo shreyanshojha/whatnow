@@ -85,6 +85,22 @@ export interface SavedEntry {
 }
 
 const SAVED_KEY = 'whatnow.saved.v2';
+// Last-used context inputs (energy/time/social/setting/budget/withKids —
+// deliberately NOT mood, which should always be asked fresh). Restoring
+// these on the next app open means a returning person mostly just picks a
+// mood and taps through, instead of re-answering the same "1 hour, solo,
+// either, a little" every single time — a small but real piece of "the app
+// remembers you" that doesn't depend on any personalization model at all.
+const LAST_CONTEXT_KEY = 'whatnow.lastContext.v1';
+
+interface StoredContext {
+  energy: Energy;
+  time: TimeVal;
+  social: Social;
+  setting: Place;
+  budget: Budget;
+  withKids: boolean;
+}
 
 interface PlanContextValue {
   // inputs
@@ -214,6 +230,38 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshUsageCounts();
   }, [refreshUsageCounts]);
+
+  // ---- Rehydrate last-used context inputs (see LAST_CONTEXT_KEY above) ----
+  const contextRehydratedRef = React.useRef(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(LAST_CONTEXT_KEY);
+        if (raw) {
+          const parsed: Partial<StoredContext> = JSON.parse(raw);
+          if (parsed.energy) setEnergy(parsed.energy);
+          if (parsed.time) setTime(parsed.time);
+          if (parsed.social) setSocial(parsed.social);
+          if (parsed.setting) setSetting(parsed.setting);
+          if (parsed.budget) setBudget(parsed.budget);
+          if (typeof parsed.withKids === 'boolean') setWithKids(parsed.withKids);
+        }
+      } catch {
+        // ignore — just start from the hardcoded defaults above
+      } finally {
+        // Only start persisting *after* rehydration finishes, so the
+        // effect below doesn't stomp the just-loaded values with the
+        // pre-rehydration defaults on the very first render.
+        contextRehydratedRef.current = true;
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!contextRehydratedRef.current) return;
+    const snapshot: StoredContext = { energy, time, social, setting, budget, withKids };
+    AsyncStorage.setItem(LAST_CONTEXT_KEY, JSON.stringify(snapshot)).catch(() => {});
+  }, [energy, time, social, setting, budget, withKids]);
 
   // ---- Rehydrate saved list (full snapshots — no dataset dependency) ----
   useEffect(() => {

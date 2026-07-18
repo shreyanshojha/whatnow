@@ -106,6 +106,53 @@ export async function clearFeedback(): Promise<void> {
   }
 }
 
+/** Raw per-activity, per-mood counts behind a scoring weight — exposed so
+ * the UI can show an honest, auditable "why this, for you specifically"
+ * line (see personalizationNote below) instead of just quietly using the
+ * signal to reorder things with no visible trace. A personalization claim
+ * a person can't see any evidence for doesn't feel different from an app
+ * that got lucky — this is what makes it feel different. */
+export interface PersonalSignal {
+  thumbsUp: number;
+  thumbsDown: number;
+  accepted: number;
+  rejected: number;
+}
+
+/** Call once per shown card (cheap — same single log read as
+ * getFeedbackWeights, just filtered to one id+mood instead of aggregated
+ * across all of them). */
+export async function getPersonalSignal(id: string, mood: MoodId): Promise<PersonalSignal> {
+  const log = await readLog();
+  const signal: PersonalSignal = { thumbsUp: 0, thumbsDown: 0, accepted: 0, rejected: 0 };
+  for (const r of log) {
+    if (r.id !== id || r.mood !== mood) continue;
+    if (r.event === 'thumbsUp') signal.thumbsUp += 1;
+    else if (r.event === 'thumbsDown') signal.thumbsDown += 1;
+    else if (r.event === 'accepted') signal.accepted += 1;
+    else if (r.event === 'rejected') signal.rejected += 1;
+  }
+  return signal;
+}
+
+/** Turns a raw signal into a short, honest sentence — or null if there's
+ * nothing real to say yet. Deliberately says nothing when the strongest
+ * signal is negative (thumbsDown/rejected outweighing the rest): this
+ * activity would already be scored down and is unlikely to be shown, and
+ * "you didn't like this" isn't a claim worth surfacing as a feature. */
+export function personalizationNote(signal: PersonalSignal, moodWord: string): string | null {
+  if (signal.thumbsUp >= 2) {
+    return `You've confirmed this works for feeling ${moodWord} ${signal.thumbsUp} times.`;
+  }
+  if (signal.thumbsUp === 1) {
+    return `You said this was a good call, last time you felt ${moodWord}.`;
+  }
+  if (signal.accepted > 0 && signal.thumbsDown === 0) {
+    return `You've saved this before when feeling ${moodWord}.`;
+  }
+  return null;
+}
+
 const WEIGHT_CAP = 6;
 
 /**
