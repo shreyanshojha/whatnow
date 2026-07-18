@@ -247,7 +247,9 @@ export default function MoodScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
-        {selectedWord ? (
+        {showCrisisNotice ? (
+          <Text style={styles.footerHintFaint}>Take your time — no rush to continue</Text>
+        ) : selectedWord ? (
           <Text style={styles.footerHint}>
             Feeling {selectedWord}. Let's tailor it.
           </Text>
