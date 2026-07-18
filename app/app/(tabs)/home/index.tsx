@@ -10,9 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MOODS, MoodId } from '../data/activities';
-import { usePlan } from '../context/PlanContext';
-import { colors, font, radius, shadow } from '../lib/theme';
+import { MOODS, MoodId } from '../../../data/activities';
+import { usePlan } from '../../../context/PlanContext';
+import { colors, font, radius, shadow } from '../../../lib/theme';
 
 export default function MoodScreen() {
   const router = useRouter();
@@ -37,19 +37,9 @@ export default function MoodScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <Text style={styles.brand}>
-            What<Text style={{ color: colors.coral }}>Now</Text>
-          </Text>
-          <View style={styles.headerLinks}>
-            <Pressable onPress={() => router.push('/saved')} hitSlop={8}>
-              <Text style={styles.headerLink}>Saved</Text>
-            </Pressable>
-            <Pressable onPress={() => router.push('/about')} hitSlop={8}>
-              <Text style={styles.headerLink}>About</Text>
-            </Pressable>
-          </View>
-        </View>
+        <Text style={styles.brand}>
+          What<Text style={{ color: colors.coral }}>Now</Text>
+        </Text>
 
         <Text style={styles.tagline}>Plans around your mood, not your calendar.</Text>
         <Text style={styles.h1}>How are you feeling right now?</Text>
@@ -93,7 +83,7 @@ export default function MoodScreen() {
         )}
         <Pressable
           disabled={!mood}
-          onPress={() => router.push('/context')}
+          onPress={() => router.push('/home/context')}
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.cta,
@@ -111,15 +101,13 @@ export default function MoodScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: 20 },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  brand: {
+    fontSize: 24,
+    fontWeight: font.bold,
+    color: colors.ink,
+    letterSpacing: -0.5,
     marginBottom: 22,
   },
-  brand: { fontSize: 24, fontWeight: font.bold, color: colors.ink, letterSpacing: -0.5 },
-  headerLinks: { flexDirection: 'row', gap: 18 },
-  headerLink: { fontSize: 15, fontWeight: font.semibold, color: colors.coralDeep },
   tagline: {
     fontSize: 14,
     color: colors.amber,

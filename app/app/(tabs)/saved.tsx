@@ -2,9 +2,9 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlan } from '../context/PlanContext';
-import { CATS, COST_LABEL, TIME_LABEL } from '../data/activities';
-import { colors, font, radius, shadow } from '../lib/theme';
+import { usePlan } from '../../context/PlanContext';
+import { CATS, COST_LABEL, TIME_LABEL } from '../../data/activities';
+import { colors, font, radius, shadow } from '../../lib/theme';
 
 export default function SavedScreen() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function SavedScreen() {
           this device.
         </Text>
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => router.push('/home')}
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         >
           <Text style={styles.ctaText}>Build a plan</Text>

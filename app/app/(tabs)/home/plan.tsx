@@ -12,18 +12,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ActivityCard } from '../components/ActivityCard';
-import { usePlan } from '../context/PlanContext';
+import { ActivityCard } from '../../../components/ActivityCard';
+import { usePlan } from '../../../context/PlanContext';
 import {
   ENERGY_LABEL,
   MOODS,
   PLACE_LABEL,
   SOCIAL_LABEL,
   TIME_LABEL,
-} from '../data/activities';
-import { colors, font, radius, shadow } from '../lib/theme';
-import { useReducedMotion } from '../lib/useReducedMotion';
-import { weatherNote } from '../lib/weather';
+} from '../../../data/activities';
+import { colors, font, radius, shadow } from '../../../lib/theme';
+import { useReducedMotion } from '../../../lib/useReducedMotion';
+import { weatherNote } from '../../../lib/weather';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -151,7 +151,7 @@ export default function PlanScreen() {
       <Pressable
         onPress={() => {
           resetFlow();
-          router.replace('/');
+          router.replace('/home');
         }}
         style={({ pressed }) => [styles.startOver, pressed && { opacity: 0.7 }]}
       >

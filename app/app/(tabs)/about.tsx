@@ -11,10 +11,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlan } from '../context/PlanContext';
-import { ACTIVITIES, MOODS } from '../data/activities';
-import { colors, font, radius } from '../lib/theme';
-import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../lib/usageLimits';
+import { usePlan } from '../../context/PlanContext';
+import { ACTIVITIES, MOODS } from '../../data/activities';
+import { colors, font, radius } from '../../lib/theme';
+import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../../lib/usageLimits';
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();

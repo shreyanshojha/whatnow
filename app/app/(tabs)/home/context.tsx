@@ -9,11 +9,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Segmented } from '../components/Segmented';
-import { usePlan } from '../context/PlanContext';
-import { MOODS } from '../data/activities';
-import { colors, font, radius, shadow } from '../lib/theme';
-import { weatherNote } from '../lib/weather';
+import { Segmented } from '../../../components/Segmented';
+import { usePlan } from '../../../context/PlanContext';
+import { MOODS } from '../../../data/activities';
+import { colors, font, radius, shadow } from '../../../lib/theme';
+import { weatherNote } from '../../../lib/weather';
 
 export default function ContextScreen() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function ContextScreen() {
     // shows its own loading state while this resolves (instant for the
     // deterministic engine, a couple seconds if AI planning is on).
     makePlan().catch(() => {});
-    router.push('/plan');
+    router.push('/home/plan');
   };
 
   const locationBody = (() => {
