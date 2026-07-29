@@ -364,7 +364,17 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         loadEventsApiKey(),
         loadGooglePlacesApiKey(),
       ]);
-      setAiEnabledState(enabled);
+      // Storage can't tell "never touched" apart from "explicitly turned
+      // off" — both persist as false/missing (see secureSettings.ts). Before
+      // the About screen's Save button auto-enabled on save, someone could
+      // save a real key and never flip the separate switch, silently getting
+      // the generic deterministic engine forever with no sign anything was
+      // wrong. Since a saved key with AI off is almost always that stale
+      // state rather than a deliberate "keep my key but don't use it," treat
+      // a present key as enabled on load too, not just at save time.
+      const effectiveEnabled = enabled || !!key.trim();
+      setAiEnabledState(effectiveEnabled);
+      if (effectiveEnabled !== enabled) saveAiEnabled(effectiveEnabled);
       setAiApiKeyState(key);
       setEventsApiKeyState(eventsKey);
       setGooglePlacesApiKeyState(googlePlacesKey);

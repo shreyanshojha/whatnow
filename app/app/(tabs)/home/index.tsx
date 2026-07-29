@@ -16,14 +16,23 @@ import { MOODS, MoodId } from '../../../data/activities';
 import { SavedEntry, usePlan } from '../../../context/PlanContext';
 import { dismissCompletionCheck, getPendingCompletionCheck } from '../../../lib/completionCheck';
 import { recordExplicitFeedback } from '../../../lib/feedback';
-import { matchMoodFromText } from '../../../lib/moodMatch';
+import { detectImpliedCategories, matchMoodFromText } from '../../../lib/moodMatch';
 import { checkForCrisisLanguage } from '../../../lib/safetyCheck';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 
 export default function MoodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { moods, toggleMood, setMood, freeformDescription, setFreeformDescription, saved } = usePlan();
+  const {
+    moods,
+    toggleMood,
+    setMood,
+    freeformDescription,
+    setFreeformDescription,
+    categories,
+    toggleCategory,
+    saved,
+  } = usePlan();
   const [otherOpen, setOtherOpen] = React.useState(!!freeformDescription);
   const [draft, setDraft] = React.useState(freeformDescription);
   const [checkIn, setCheckIn] = React.useState<SavedEntry | null>(null);
@@ -53,6 +62,10 @@ export default function MoodScreen() {
   const pick = (id: MoodId) => {
     toggleMood(id);
     setFreeformDescription(''); // a real mood tile always wins over stale freeform text
+    // Undo any category nudge a previous freeform description implied (e.g.
+    // "hungry" → food, see detectImpliedCategories) — a real mood tile is a
+    // fresh start, not a refinement of the stale freeform text.
+    for (const cat of categories) toggleCategory(cat);
     setOtherOpen(false);
     setShowCrisisNotice(false); // switching to a normal mood tile clears any lingering notice
     if (Platform.OS !== 'web') {
@@ -71,6 +84,14 @@ export default function MoodScreen() {
     const matched = matchMoodFromText(text);
     setMood(matched);
     setFreeformDescription(text);
+    // AI planning reads the raw text directly and handles this on its own,
+    // but the deterministic fallback engine only ever sees the matched mood
+    // bucket — so something like "hungry" (a physical state, not one of the
+    // 12 moods) needs a category nudge too, or it can land on anything at
+    // all. See lib/moodMatch.ts's detectImpliedCategories.
+    for (const cat of detectImpliedCategories(text)) {
+      if (!categories.includes(cat)) toggleCategory(cat);
+    }
     if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
     router.push('/home/context');
   };

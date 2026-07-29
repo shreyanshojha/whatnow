@@ -17,7 +17,7 @@
    the hood, not a claim that the words were thrown away.
    ============================================================ */
 
-import { MoodId } from '../data/activities';
+import { CatId, MoodId } from '../data/activities';
 
 const KEYWORDS: Record<MoodId, string[]> = {
   restless: ['restless', 'antsy', 'fidgety', 'pent up', 'pent-up', 'can\'t sit still', 'jittery', 'wired up'],
@@ -50,4 +50,32 @@ export function matchMoodFromText(text: string): MoodId {
     }
   }
   return best;
+}
+
+// "Hungry," "thirsty," "starving" describe a physical state, not an emotion —
+// none of the 12 mood buckets above fit them, so matchMoodFromText falls
+// through to 'curious' (its open, no-real-match default) and the deterministic
+// engine (which never reads the raw freeform text — see PlanInput.freeform's
+// doc comment) had nothing food-related to lean on, hence things like a
+// "hungry" description surfacing a frisbee suggestion. AI planning already
+// reads the raw text directly and handles this fine on its own; this is
+// specifically the safety net for when AI is off, fails, or is capped.
+const CATEGORY_KEYWORDS: Partial<Record<CatId, string[]>> = {
+  food: [
+    'hungry', 'starving', 'famished', 'peckish', 'thirsty',
+    'want to eat', 'need to eat', 'grab a bite', 'grab food', 'get food',
+  ],
+};
+
+/** Any categories a freeform description clearly implies, to pre-select
+ * alongside the closest mood match (see the mood screen's "Other" flow) —
+ * currently just "hungry"/food-related text → the `food` category. Empty
+ * array means "no strong implication, don't narrow anything." */
+export function detectImpliedCategories(text: string): CatId[] {
+  const lower = text.toLowerCase();
+  const cats: CatId[] = [];
+  for (const cat of Object.keys(CATEGORY_KEYWORDS) as CatId[]) {
+    if (CATEGORY_KEYWORDS[cat]!.some((kw) => lower.includes(kw))) cats.push(cat);
+  }
+  return cats;
 }
