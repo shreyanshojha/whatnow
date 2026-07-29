@@ -64,6 +64,10 @@ export default function AboutScreen() {
 
   const onSaveKey = () => {
     setAiApiKey(keyDraft);
+    // Saving a real key is a clear enough signal of intent — don't also make
+    // someone hunt for a separate switch. Pasting a key turns AI planning on;
+    // clearing the field back out turns it back off.
+    setAiEnabled(!!keyDraft.trim());
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1800);
   };

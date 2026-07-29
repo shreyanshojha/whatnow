@@ -60,10 +60,17 @@ function buildPrompt(placeName: string | null): string {
     `Find 5 to 8 results total, split across two kinds:`,
     `1) Local events, meetups, or pop-ups happening in the next week or so — ` +
       `check sources like Eventbrite, Meetup, local venue sites, and local news, ` +
-      `not just well-known ticketing platforms. Unlisted, small, or niche is fine ` +
-      `and encouraged — the goal is things a person wouldn't easily find any other way.`,
-    `2) Movies that are newly released and currently playing in theaters ` +
-      `${placeName ? `near "${placeName}"` : 'right now'}.`,
+      `not just well-known ticketing platforms. Small or under-the-radar is great, but ` +
+      `every result must be something a random stranger to the area could actually show ` +
+      `up to and enjoy: a concert, a market, an art walk, a comedy show, a class or ` +
+      `workshop, a tasting, a fair. Hard exclude anything membership-only, invite-only, ` +
+      `or restricted to a specific organization's members (homeowners'/neighborhood ` +
+      `associations, private clubs, alumni groups, work meetups) — if attending requires ` +
+      `belonging to a group the person isn't already in, leave it out. Also skip routine ` +
+      `civic maintenance (street sweeping, utility notices) — that's not an activity.`,
+    `2) Specific movies that are newly released and currently playing in theaters ` +
+      `${placeName ? `near "${placeName}"` : 'right now'}. "name" must be the movie's ` +
+      `actual title, never a theater's name — the blurb can mention where it's playing.`,
     `For each result give exactly: "name" (short), "blurb" (one plain sentence, ` +
       `no hype), "category" (the literal string "event" or "movie"), and "url" ` +
       `(a real URL from your search results, or null if you don't have a genuine one — ` +
