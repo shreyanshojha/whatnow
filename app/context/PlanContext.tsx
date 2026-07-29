@@ -30,7 +30,7 @@ import {
   recordRejected,
   recordShown,
 } from '../lib/feedback';
-import { fetchNearbyEvents, fetchYelpEvents, LiveEvent } from '../lib/events';
+import { fetchNearbyEvents, LiveEvent } from '../lib/events';
 import { addLocationVisit, clearLocationHistory, getPatternHint } from '../lib/locationHistory';
 import { NearbyResult, searchNearby } from '../lib/nearbySearch';
 import { generatePlan, PlanInput, WeatherState } from '../lib/plan';
@@ -45,11 +45,11 @@ import {
   loadAiApiKey,
   loadAiEnabled,
   loadEventsApiKey,
-  loadYelpApiKey,
+  loadGooglePlacesApiKey,
   saveAiApiKey,
   saveAiEnabled,
   saveEventsApiKey,
-  saveYelpApiKey,
+  saveGooglePlacesApiKey,
 } from '../lib/secureSettings';
 import {
   MAX_AI_PLANS_PER_DAY,
@@ -190,12 +190,13 @@ interface PlanContextValue {
    * instead" rather than a plan that's silently indistinguishable from any
    * other fallback. Reset at the start of every subsequent attempt. */
   sharedAiCapped: boolean;
-  // Live nearby events (optional, bring-your-own-key) — two independent
-  // sources, either or both can be set (see lib/events.ts).
+  // Live nearby events (optional, bring-your-own-key)
   eventsApiKey: string;
   setEventsApiKey: (key: string) => void;
-  yelpApiKey: string;
-  setYelpApiKey: (key: string) => void;
+  // Google Places (optional, bring-your-own-key) — upgrades "Nearby right
+  // now" venue quality beyond free OpenStreetMap data (see lib/places.ts).
+  googlePlacesApiKey: string;
+  setGooglePlacesApiKey: (key: string) => void;
   // On-device-only location pattern memory (see lib/locationHistory.ts)
   clearLocationHistory: () => void;
   // On-device-only accept/reject learning log (see lib/feedback.ts)
@@ -260,7 +261,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [aiEnabled, setAiEnabledState] = useState(false);
   const [aiApiKey, setAiApiKeyState] = useState('');
   const [eventsApiKey, setEventsApiKeyState] = useState('');
-  const [yelpApiKey, setYelpApiKeyState] = useState('');
+  const [googlePlacesApiKey, setGooglePlacesApiKeyState] = useState('');
 
   const [aiPlansRemainingToday, setAiPlansRemainingToday] = useState(MAX_AI_PLANS_PER_DAY);
   const [eventsLookupsRemainingToday, setEventsLookupsRemainingToday] = useState(
@@ -357,16 +358,16 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   // ---- Rehydrate AI + events settings ----
   useEffect(() => {
     (async () => {
-      const [enabled, key, eventsKey, yelpKey] = await Promise.all([
+      const [enabled, key, eventsKey, googlePlacesKey] = await Promise.all([
         loadAiEnabled(),
         loadAiApiKey(),
         loadEventsApiKey(),
-        loadYelpApiKey(),
+        loadGooglePlacesApiKey(),
       ]);
       setAiEnabledState(enabled);
       setAiApiKeyState(key);
       setEventsApiKeyState(eventsKey);
-      setYelpApiKeyState(yelpKey);
+      setGooglePlacesApiKeyState(googlePlacesKey);
     })();
   }, []);
 
@@ -385,9 +386,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     saveEventsApiKey(key);
   }, []);
 
-  const setYelpApiKey = useCallback((key: string) => {
-    setYelpApiKeyState(key);
-    saveYelpApiKey(key);
+  const setGooglePlacesApiKey = useCallback((key: string) => {
+    setGooglePlacesApiKeyState(key);
+    saveGooglePlacesApiKey(key);
   }, []);
 
   const persistSaved = useCallback((entries: SavedEntry[]) => {
@@ -633,36 +634,28 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
    * decides what locationStatus to fall back to if this itself fails. */
   const applyResolvedLocation = useCallback(
     async (lat: number, lon: number, radiusMeters: number): Promise<void> => {
-      // Both are independent + individually wrapped; never throw here.
-      const [w, n] = await Promise.all([fetchWeather(lat, lon), fetchNearby(lat, lon, radiusMeters)]);
+      // Both are independent + individually wrapped; never throw here. A
+      // Google Places key (if set) upgrades the venue data inside fetchNearby
+      // — see lib/places.ts — with free OpenStreetMap data as the baseline.
+      const [w, n] = await Promise.all([
+        fetchWeather(lat, lon),
+        fetchNearby(lat, lon, radiusMeters, googlePlacesApiKey || undefined),
+      ]);
       if (w) setWeather(w);
       if (n) setNearby(n);
       setLocationStatus('granted');
       // On-device only — nothing here ever leaves the phone. See lib/locationHistory.ts.
       if (mood) addLocationVisit(mood, n?.placeName ?? null).catch(() => {});
 
-      // Live events are their own optional, bring-your-own-key layer —
-      // Ticketmaster and Yelp are independent sources (see lib/events.ts),
-      // either or both can be configured. One shared daily cap covers a
-      // single "look up nearby events" attempt regardless of how many
-      // sources it actually queries.
-      if ((eventsApiKey || yelpApiKey) && (await canUseEventsLookupToday())) {
+      // Live events are their own optional, bring-your-own-key layer (see
+      // lib/events.ts) — Ticketmaster is the only source right now (Google
+      // has no public events-search API to pair with its Places data).
+      if (eventsApiKey && (await canUseEventsLookupToday())) {
         setEventsLoading(true);
-        Promise.all([
-          eventsApiKey ? fetchNearbyEvents(lat, lon, eventsApiKey) : Promise.resolve<LiveEvent[]>([]),
-          yelpApiKey ? fetchYelpEvents(lat, lon, yelpApiKey) : Promise.resolve<LiveEvent[]>([]),
-        ])
-          .then(([ticketmasterEvents, yelpEvents]) => {
-            // Interleaved, not concatenated — so a full page from one
-            // source doesn't bury the other one entirely when both are on.
-            const merged: LiveEvent[] = [];
-            const max = Math.max(ticketmasterEvents.length, yelpEvents.length);
-            for (let i = 0; i < max; i++) {
-              if (ticketmasterEvents[i]) merged.push(ticketmasterEvents[i]);
-              if (yelpEvents[i]) merged.push(yelpEvents[i]);
-            }
-            setNearbyEvents(merged);
-            if (merged.length > 0) {
+        fetchNearbyEvents(lat, lon, eventsApiKey)
+          .then((events) => {
+            setNearbyEvents(events);
+            if (events.length > 0) {
               recordEventsLookupUse().then(refreshUsageCounts);
             }
           })
@@ -670,7 +663,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           .finally(() => setEventsLoading(false));
       }
     },
-    [eventsApiKey, yelpApiKey, mood, refreshUsageCounts]
+    [eventsApiKey, googlePlacesApiKey, mood, refreshUsageCounts]
   );
 
   const requestLocation = useCallback((): Promise<void> => {
@@ -875,8 +868,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     sharedAiCapped,
     eventsApiKey,
     setEventsApiKey,
-    yelpApiKey,
-    setYelpApiKey,
+    googlePlacesApiKey,
+    setGooglePlacesApiKey,
     clearLocationHistory,
     clearFeedback,
     resetFlow,

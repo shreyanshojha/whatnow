@@ -211,17 +211,109 @@ async function nearbyVenues(lat: number, lon: number, radius: number = 1500): Pr
   return venues.slice(0, 8);
 }
 
-export async function fetchNearby(lat: number, lon: number, radius: number = 1500): Promise<NearbyPlace> {
-  const key = `${lat.toFixed(2)},${lon.toFixed(2)},${radius}`;
+/* ============================================================
+   Google Places (optional, bring-your-own-key) — a paid upgrade
+   over the free OpenStreetMap venues above. Same NearbyVenue shape,
+   same "kind" vocabulary (see GOOGLE_TYPE_TO_KIND), so every existing
+   consumer (the "Nearby right now" list, each activity card's
+   category-matched tip in ActivityCard.tsx) works unchanged whether
+   a venue came from OSM or Google. Used only when a key is present;
+   never required, never blocks fetchNearby if it fails.
+   ============================================================ */
+const GOOGLE_TYPE_TO_KIND: Record<string, string> = {
+  park: 'park',
+  cafe: 'cafe',
+  library: 'library',
+  gym: 'gym',
+  restaurant: 'restaurant',
+  bar: 'bar',
+  museum: 'museum',
+  book_store: 'bookstore',
+  movie_theater: 'cinema',
+};
+
+async function fetchGoogleType(
+  type: string,
+  lat: number,
+  lon: number,
+  radius: number,
+  apiKey: string
+): Promise<any[]> {
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
+      `?location=${lat},${lon}&radius=${radius}&type=${type}&key=${encodeURIComponent(apiKey)}`;
+    const res = await timedFetch(url, 9000);
+    if (!res.ok) throw new Error('places http ' + res.status);
+    const data = await res.json();
+    // Google's own status field, not just the HTTP code, carries most real
+    // failures here (bad key, billing not enabled, over quota) — treat
+    // anything but a clean OK/ZERO_RESULTS as "no results," same graceful
+    // degrade as every other optional source in this file.
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') return [];
+    return Array.isArray(data.results) ? data.results : [];
+  } catch {
+    return [];
+  }
+}
+
+async function googlePlacesVenues(
+  lat: number,
+  lon: number,
+  radius: number,
+  apiKey: string
+): Promise<NearbyVenue[]> {
+  const types = Object.keys(GOOGLE_TYPE_TO_KIND);
+  const groups = await Promise.all(types.map((t) => fetchGoogleType(t, lat, lon, radius, apiKey)));
+
+  const seen = new Set<string>();
+  const venues: NearbyVenue[] = [];
+  groups.forEach((results, i) => {
+    const kind = GOOGLE_TYPE_TO_KIND[types[i]];
+    for (const r of results) {
+      const name = r?.name as string | undefined;
+      const rLat = r?.geometry?.location?.lat;
+      const rLon = r?.geometry?.location?.lng;
+      if (!name || typeof rLat !== 'number' || typeof rLon !== 'number') continue;
+      if (seen.has(name)) continue; // a place can match more than one type search
+      seen.add(name);
+      venues.push({ name, kind, distanceM: Math.round(distanceMeters(lat, lon, rLat, rLon)) });
+    }
+  });
+  venues.sort((a, b) => a.distanceM - b.distanceM);
+  return venues.slice(0, 8);
+}
+
+export async function fetchNearby(
+  lat: number,
+  lon: number,
+  radius: number = 1500,
+  googlePlacesApiKey?: string
+): Promise<NearbyPlace> {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)},${radius},${googlePlacesApiKey ? 'g' : 'o'}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return hit.value;
 
-  // Run both, but never let one failure sink the other.
-  const [placeName, venues] = await Promise.all([
+  // Run everything in parallel, but never let one source's failure sink
+  // another. Google (when a key is set) leads the merged list — it's what
+  // the person paid to get better data from — with OSM filling any gaps
+  // and acting as the sole source when no key is set at all.
+  const [placeName, osmVenues, googleVenues] = await Promise.all([
     reverseGeocode(lat, lon),
     nearbyVenues(lat, lon, radius),
+    googlePlacesApiKey ? googlePlacesVenues(lat, lon, radius, googlePlacesApiKey) : Promise.resolve<NearbyVenue[]>([]),
   ]);
-  const value: NearbyPlace = { placeName, venues };
+
+  const seen = new Set<string>();
+  const venues: NearbyVenue[] = [];
+  for (const v of [...googleVenues, ...osmVenues]) {
+    if (seen.has(v.name)) continue;
+    seen.add(v.name);
+    venues.push(v);
+  }
+  venues.sort((a, b) => a.distanceM - b.distanceM);
+
+  const value: NearbyPlace = { placeName, venues: venues.slice(0, 8) };
   cache.set(key, { at: Date.now(), value });
   return value;
 }

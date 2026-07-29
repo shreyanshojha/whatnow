@@ -21,11 +21,11 @@
 export const SHARED_BETA_AI_ENABLED = true;
 
 /** Whether the About screen shows the "bring your own key" switch/input/save
- * button for AI planning. Kept in the codebase (not deleted) for whenever
- * BYOK becomes relevant again — after the beta, or for someone who wants a
- * higher personal limit — but hidden for now per Shreyansh's request for a
- * simpler flow: everyone signed in already gets AI planning automatically
- * via the shared key, so a second, more complicated way to get the same
- * thing is just clutter during the beta. Flip back to true to restore it;
- * no other code changes needed. */
-export const SHOW_BYOK_AI_UI = false;
+ * button for AI planning. Turned back on: the shared beta path depends on
+ * sign-in, which depends on the Supabase project being up — and free-tier
+ * Supabase projects auto-pause after a week idle, which just happened here.
+ * BYOK has zero backend dependency (the key goes straight from the device to
+ * Anthropic), so keeping this visible means AI planning still works even if
+ * Supabase is ever paused, slow, or mid-restore again. Flip back to false if
+ * this ever feels like one too many options during a later, calmer pass. */
+export const SHOW_BYOK_AI_UI = true;

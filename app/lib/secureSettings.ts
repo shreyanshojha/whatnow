@@ -15,7 +15,7 @@ import * as SecureStore from 'expo-secure-store';
 const AI_ENABLED_KEY = 'whatnow.ai.enabled.v1';
 const AI_API_KEY_KEY = 'whatnow_ai_api_key_v1';
 const EVENTS_API_KEY_KEY = 'whatnow_ticketmaster_api_key_v1';
-const YELP_API_KEY_KEY = 'whatnow_yelp_api_key_v1';
+const GOOGLE_PLACES_API_KEY_KEY = 'whatnow_google_places_api_key_v1';
 
 export async function loadAiEnabled(): Promise<boolean> {
   try {
@@ -76,25 +76,26 @@ export async function saveEventsApiKey(key: string): Promise<void> {
   }
 }
 
-/** Yelp Fusion API key — a second, independent nearby-events source (see
- * lib/events.ts's fetchYelpEvents) alongside Ticketmaster. Kept as its own
- * key/setting since it's a different provider with its own free-tier signup,
- * not a replacement for the Ticketmaster one. */
-export async function loadYelpApiKey(): Promise<string> {
+/** Google Places API key — an optional, paid upgrade over the free
+ * OpenStreetMap venue data in lib/places.ts (better names, more complete
+ * coverage). Kept as its own key/setting since it's billed through Google
+ * Cloud, not Ticketmaster's account. (Yelp was considered instead but
+ * dropped for cost reasons; Google Places has a usable free monthly credit.) */
+export async function loadGooglePlacesApiKey(): Promise<string> {
   try {
-    const value = await SecureStore.getItemAsync(YELP_API_KEY_KEY);
+    const value = await SecureStore.getItemAsync(GOOGLE_PLACES_API_KEY_KEY);
     return value ?? '';
   } catch {
     return '';
   }
 }
 
-export async function saveYelpApiKey(key: string): Promise<void> {
+export async function saveGooglePlacesApiKey(key: string): Promise<void> {
   try {
     if (key.trim()) {
-      await SecureStore.setItemAsync(YELP_API_KEY_KEY, key.trim());
+      await SecureStore.setItemAsync(GOOGLE_PLACES_API_KEY_KEY, key.trim());
     } else {
-      await SecureStore.deleteItemAsync(YELP_API_KEY_KEY);
+      await SecureStore.deleteItemAsync(GOOGLE_PLACES_API_KEY_KEY);
     }
   } catch {
     // ignore — in-memory state still holds for this session

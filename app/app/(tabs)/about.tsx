@@ -35,8 +35,8 @@ export default function AboutScreen() {
     sharedAiAvailable,
     eventsApiKey,
     setEventsApiKey,
-    yelpApiKey,
-    setYelpApiKey,
+    googlePlacesApiKey,
+    setGooglePlacesApiKey,
     clearLocationHistory,
     clearFeedback,
     aiPlansRemainingToday,
@@ -46,8 +46,8 @@ export default function AboutScreen() {
   const [savedFlash, setSavedFlash] = React.useState(false);
   const [eventsKeyDraft, setEventsKeyDraft] = React.useState(eventsApiKey);
   const [eventsSavedFlash, setEventsSavedFlash] = React.useState(false);
-  const [yelpKeyDraft, setYelpKeyDraft] = React.useState(yelpApiKey);
-  const [yelpSavedFlash, setYelpSavedFlash] = React.useState(false);
+  const [googlePlacesKeyDraft, setGooglePlacesKeyDraft] = React.useState(googlePlacesApiKey);
+  const [googlePlacesSavedFlash, setGooglePlacesSavedFlash] = React.useState(false);
   const [historyCleared, setHistoryCleared] = React.useState(false);
   const [learningCleared, setLearningCleared] = React.useState(false);
 
@@ -59,8 +59,8 @@ export default function AboutScreen() {
     setEventsKeyDraft(eventsApiKey);
   }, [eventsApiKey]);
   React.useEffect(() => {
-    setYelpKeyDraft(yelpApiKey);
-  }, [yelpApiKey]);
+    setGooglePlacesKeyDraft(googlePlacesApiKey);
+  }, [googlePlacesApiKey]);
 
   const onSaveKey = () => {
     setAiApiKey(keyDraft);
@@ -74,10 +74,10 @@ export default function AboutScreen() {
     setTimeout(() => setEventsSavedFlash(false), 1800);
   };
 
-  const onSaveYelpKey = () => {
-    setYelpApiKey(yelpKeyDraft);
-    setYelpSavedFlash(true);
-    setTimeout(() => setYelpSavedFlash(false), 1800);
+  const onSaveGooglePlacesKey = () => {
+    setGooglePlacesApiKey(googlePlacesKeyDraft);
+    setGooglePlacesSavedFlash(true);
+    setTimeout(() => setGooglePlacesSavedFlash(false), 1800);
   };
 
   const onClearHistory = () => {
@@ -136,56 +136,6 @@ export default function AboutScreen() {
       </Text>
 
       <AccountCard />
-      <YourPatterns />
-
-      <View style={styles.card}>
-        <Text style={styles.cardH}>How it works</Text>
-        <Step n="1" t="Pick a mood" d={`One of ${MOODS.length} feelings, from restless to content.`} />
-        <Step n="2" t="Set the scene" d="Energy, time, solo or social, indoor/outdoor, budget." />
-        <Step n="3" t="Get your plan" d="2–5 ideas, each with a why-this-helps. Reshuffle or save any." />
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.acctHeaderRow}>
-          <Icon name="shield" size={18} color={colors.ink} strokeWidth={1.7} />
-          <Text style={styles.cardH}>Privacy</Text>
-        </View>
-        <Text style={styles.cardP}>
-          Signing in is optional — everything below works fully on this device without an
-          account.{'\n\n'}
-          <Text style={font.semibold}>If you sign in: </Text>
-          your saved activities, feedback, and plan history sync to WhatNow's servers,
-          readable only by your account — just to sharpen your plans and follow you across
-          devices. Never sold, never shared with advertisers. Delete your account above to
-          erase it all.{'\n\n'}
-          <Text style={font.semibold}>Location (optional): </Text>
-          each time you grant it, WhatNow briefly checks live weather (Open-Meteo) and nearby
-          places (OpenStreetMap) for that one plan only — sent only to those services.{'\n\n'}
-          <Text style={font.semibold}>On-device memory: </Text>
-          WhatNow also keeps a neighborhood-level pattern memory (never exact GPS) locally,
-          never uploaded. Wipe either memory below anytime; deleting the app removes both for
-          good.{'\n\n'}
-          Full details in PRIVACY.md.
-        </Text>
-        <Pressable
-          onPress={onClearHistory}
-          accessibilityRole="button"
-          accessibilityLabel="Clear location history"
-          hitSlop={6}
-          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
-        >
-          <FlashLabel flashed={historyCleared} flashedText="Cleared" idleText="Clear location history" />
-        </Pressable>
-        <Pressable
-          onPress={onClearFeedback}
-          accessibilityRole="button"
-          accessibilityLabel="Clear learning history"
-          hitSlop={6}
-          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
-        >
-          <FlashLabel flashed={learningCleared} flashedText="Cleared" idleText="Clear learning history" />
-        </Pressable>
-      </View>
 
       <View style={styles.card}>
         {SHOW_BYOK_AI_UI ? (
@@ -200,17 +150,15 @@ export default function AboutScreen() {
               />
             </View>
             <Text style={styles.cardP}>
-              WhatNow can ask an AI to compose a fresh plan for this moment, instead of picking
-              from the built-in list.{'\n\n'}
               {sharedAiAvailable
-                ? 'During the beta this works automatically — no key needed, with a fair shared ' +
-                  'daily cap. Hit it, and WhatNow uses its built-in matching until tomorrow.\n\n'
+                ? 'Already working automatically while you\'re signed in, with a fair shared daily ' +
+                  'cap. '
                 : ''}
-              Bring your own key instead: stored only on this device, sent straight to the
-              provider, never through our servers. Off, missing, or failed? WhatNow falls back
-              to built-in matching instantly — no broken plans.{'\n\n'}
-              Capped at {MAX_AI_PLANS_PER_DAY} plans/day (resets at midnight). The same key also
-              powers "Look online nearby" on your plan screen, with its own smaller cap.
+              Want your own key instead? Paste an Anthropic API key below — it stays on this
+              device and is never sent through our servers. Off, missing, or failed, and WhatNow
+              just falls back to its built-in matching, no broken plans.{'\n\n'}
+              Capped at {MAX_AI_PLANS_PER_DAY} plans/day. Also powers "Look online nearby" on the
+              plan screen.
             </Text>
             <TextInput
               value={keyDraft}
@@ -258,14 +206,69 @@ export default function AboutScreen() {
         )}
       </View>
 
+      <YourPatterns />
+
       <View style={styles.card}>
-        <Text style={styles.cardH}>Live nearby events (optional)</Text>
+        <Text style={styles.cardH}>How it works</Text>
+        <Step n="1" t="Pick a mood" d={`One of ${MOODS.length} feelings, from restless to content.`} />
+        <Step n="2" t="Set the scene" d="Energy, time, solo or social, indoor/outdoor, budget." />
+        <Step n="3" t="Get your plan" d="2–5 ideas, each with a why-this-helps. Reshuffle or save any." />
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.acctHeaderRow}>
+          <Icon name="shield" size={18} color={colors.ink} strokeWidth={1.7} />
+          <Text style={styles.cardH}>Privacy</Text>
+        </View>
         <Text style={styles.cardP}>
-          Add free keys to see real events in "Nearby right now" — Ticketmaster for concerts,
-          shows, and games; Yelp for smaller local and community events. Either or both work on
-          their own. Both stay on this device, sent straight to their own provider. No keys?
-          You'll still see nearby venues from OpenStreetMap. Shares one cap of{' '}
-          {MAX_EVENTS_LOOKUPS_PER_DAY} lookups/day, resets at midnight.
+          Signing in is optional — everything below works fully on this device without an
+          account.{'\n\n'}
+          <Text style={font.semibold}>If you sign in: </Text>
+          your saved activities, feedback, and plan history sync to WhatNow's servers,
+          readable only by your account — just to sharpen your plans and follow you across
+          devices. Never sold, never shared with advertisers. Delete your account above to
+          erase it all.{'\n\n'}
+          <Text style={font.semibold}>Location (optional): </Text>
+          each time you grant it, WhatNow briefly checks live weather (Open-Meteo) and nearby
+          places (OpenStreetMap, or Google Places if you've added a key) for that one plan
+          only — sent only to those services.{'\n\n'}
+          <Text style={font.semibold}>On-device memory: </Text>
+          WhatNow also keeps a neighborhood-level pattern memory (never exact GPS) locally,
+          never uploaded. Wipe either memory below anytime; deleting the app removes both for
+          good.{'\n\n'}
+          Full details in PRIVACY.md.
+        </Text>
+        <Pressable
+          onPress={onClearHistory}
+          accessibilityRole="button"
+          accessibilityLabel="Clear location history"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <FlashLabel flashed={historyCleared} flashedText="Cleared" idleText="Clear location history" />
+        </Pressable>
+        <Pressable
+          onPress={onClearFeedback}
+          accessibilityRole="button"
+          accessibilityLabel="Clear learning history"
+          hitSlop={6}
+          style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
+        >
+          <FlashLabel flashed={learningCleared} flashedText="Cleared" idleText="Clear learning history" />
+        </Pressable>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardH}>Live events & better venues (optional)</Text>
+        <Text style={styles.cardP}>
+          Two separate, independent upgrades — add either, both, or neither.{'\n\n'}
+          <Text style={font.semibold}>Ticketmaster: </Text>
+          real concerts, shows, and games show up in "Nearby right now."{'\n\n'}
+          <Text style={font.semibold}>Google Places: </Text>
+          sharper, more complete nearby-spot names than the free OpenStreetMap data WhatNow
+          uses by default.{'\n\n'}
+          Both keys stay on this device, sent straight to their own provider. Ticketmaster
+          lookups are capped at {MAX_EVENTS_LOOKUPS_PER_DAY}/day.
         </Text>
         <TextInput
           value={eventsKeyDraft}
@@ -288,9 +291,9 @@ export default function AboutScreen() {
         </Pressable>
 
         <TextInput
-          value={yelpKeyDraft}
-          onChangeText={setYelpKeyDraft}
-          placeholder="Paste your Yelp API key"
+          value={googlePlacesKeyDraft}
+          onChangeText={setGooglePlacesKeyDraft}
+          placeholder="Paste your Google Places API key"
           placeholderTextColor={colors.inkFaint}
           secureTextEntry
           autoCapitalize="none"
@@ -298,15 +301,15 @@ export default function AboutScreen() {
           style={[styles.keyInput, { marginTop: 12 }]}
         />
         <Pressable
-          onPress={onSaveYelpKey}
+          onPress={onSaveGooglePlacesKey}
           accessibilityRole="button"
-          accessibilityLabel="Save Yelp API key"
+          accessibilityLabel="Save Google Places API key"
           hitSlop={6}
           style={({ pressed }) => [styles.keyActionBtn, pressed && { opacity: 0.7 }]}
         >
-          <FlashLabel flashed={yelpSavedFlash} flashedText="Saved" idleText="Save Yelp key" />
+          <FlashLabel flashed={googlePlacesSavedFlash} flashedText="Saved" idleText="Save Google Places key" />
         </Pressable>
-        {eventsApiKey || yelpApiKey ? (
+        {eventsApiKey ? (
           <Text style={styles.usageText}>
             {eventsLookupsRemainingToday} of {MAX_EVENTS_LOOKUPS_PER_DAY} left today
           </Text>

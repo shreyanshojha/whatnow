@@ -70,77 +70,14 @@ export async function fetchNearbyEvents(
   }
 }
 
-/* ============================================================
-   Yelp Fusion API — a second, independent live-events source
-   (developer.yelp.com's /v3/events), used alongside Ticketmaster
-   in "Nearby right now." Ticketmaster mostly covers big ticketed
-   shows/sports; Yelp's events database leans more toward smaller,
-   local, often free community events — genuinely different
-   coverage, not a duplicate. Same bring-your-own-key posture as
-   everything else here: free-tier signup, key stays on-device,
-   sent straight to Yelp.
+/* Yelp Events was evaluated as a second events source and briefly wired up
+   here, but dropped: Yelp's API pricing doesn't fit a lightweight optional
+   feature like this one. Google Places (see lib/places.ts) was added
+   instead as the BYOK upgrade path, though it covers venues, not scheduled
+   events — Google has no public events-search API, so Ticketmaster above
+   remains the only events source for now.
 
-   (Eventbrite was evaluated too — its public event-search API was
-   shut down in December 2019 and has stayed shut down since; the
-   only endpoints left require already knowing an organizer's ID,
-   which can't power a generic "what's near me" search. Not wired
-   up here for that reason, not an oversight.)
-   ============================================================ */
-
-function parseYelpEvent(raw: any): LiveEvent | null {
-  if (!raw || typeof raw.name !== 'string') return null;
-  const start: string | undefined = raw.time_start;
-  return {
-    name: raw.name,
-    url: (typeof raw.event_site_url === 'string' && raw.event_site_url) ||
-      (typeof raw.tickets_url === 'string' && raw.tickets_url) ||
-      null,
-    segment: typeof raw.category === 'string' ? yelpCategoryLabel(raw.category) : null,
-    venueName: raw.location?.address1 ?? null,
-    city: raw.location?.city ?? null,
-    localDate: start ? start.slice(0, 10) : null,
-    localTime: start && start.length >= 16 ? start.slice(11, 16) : null,
-  };
-}
-
-/** Yelp's event categories are lowercase-hyphenated slugs (e.g.
- * "music", "food-and-drink") — title-cased here so they read the same
- * as Ticketmaster's segment names ("Music", "Arts & Theatre") in the UI. */
-function yelpCategoryLabel(slug: string): string {
-  return slug
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
-export async function fetchYelpEvents(
-  lat: number,
-  lon: number,
-  apiKey: string,
-  radiusKm = 15
-): Promise<LiveEvent[]> {
-  if (!apiKey || !apiKey.trim()) return [];
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 9000);
-  try {
-    // Yelp takes radius in meters, capped at 40000 (40km) by the API itself.
-    const radiusMeters = Math.min(Math.round(radiusKm * 1000), 40000);
-    const url =
-      `https://api.yelp.com/v3/events` +
-      `?latitude=${lat}&longitude=${lon}&radius=${radiusMeters}` +
-      `&sort_by=time_start&limit=10`;
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${apiKey.trim()}` },
-    });
-    if (!res.ok) return []; // includes bad/expired keys — degrade quietly
-    const data = await res.json();
-    const raw: any[] = data?.events ?? [];
-    return raw.map(parseYelpEvent).filter((e): e is LiveEvent => e !== null);
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
-  }
-}
+   (Eventbrite was evaluated too — its public event-search API was shut
+   down in December 2019 and has stayed shut down since; the only endpoints
+   left require already knowing an organizer's ID, which can't power a
+   generic "what's near me" search.) */
