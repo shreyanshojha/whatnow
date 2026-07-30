@@ -225,19 +225,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: null };
       }
 
-      // Supabase's JS client defaults to the PKCE flow, so the redirect
-      // comes back as a normal "?code=..." query param (not a "#access_
-      // token=..." URL fragment) — Linking.parse only reads query params,
-      // which lines up with that. exchangeCodeForSession does the rest.
+      // This project's Supabase instance actually redirects back with
+      // tokens straight in the URL fragment ("#access_token=...&refresh_
+      // token=...", the implicit-flow shape) rather than a "?code=..."
+      // query param — confirmed by inspecting a real redirect during
+      // testing. Linking.parse only reads query params, so a `code`-only
+      // check here silently failed every real sign-in with "no session
+      // came back" even though Google + Supabase had both already
+      // succeeded. Handle both shapes: prefer the PKCE `code` if a future
+      // Supabase config change starts sending one, otherwise fall back to
+      // reading the fragment directly and setting the session from it.
       const { queryParams } = Linking.parse(result.url);
       const authError = queryParams?.error_description ?? queryParams?.error;
       if (authError) return { error: friendlyAuthError(String(authError)) };
+
       const code = queryParams?.code as string | undefined;
-      if (!code) {
+      if (code) {
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeErr) return { error: friendlyAuthError(exchangeErr.message) };
+        await writeConsent(acceptedPrivacyVersion);
+        return { error: null };
+      }
+
+      const hashIndex = result.url.indexOf('#');
+      const hashParams = new URLSearchParams(hashIndex >= 0 ? result.url.slice(hashIndex + 1) : '');
+      const access_token = hashParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token');
+      if (!access_token || !refresh_token) {
         return { error: 'Google sign-in finished, but no session came back — try again.' };
       }
-      const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-      if (exchangeErr) return { error: friendlyAuthError(exchangeErr.message) };
+      const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (setErr) return { error: friendlyAuthError(setErr.message) };
       await writeConsent(acceptedPrivacyVersion);
       return { error: null };
     } catch {
