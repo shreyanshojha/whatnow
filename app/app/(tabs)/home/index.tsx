@@ -20,6 +20,12 @@ import { detectImpliedCategories, matchMoodFromText } from '../../../lib/moodMat
 import { checkForCrisisLanguage } from '../../../lib/safetyCheck';
 import { colors, font, fontDisplay, radius, shadow } from '../../../lib/theme';
 
+// A broadly-compatible starting set for "Surprise me" — moods where almost
+// any activity category could plausibly fit, so a random pick never reads
+// as tone-deaf (nothing here implies distress that deserves a more careful,
+// specifically-matched suggestion the way "anxious" or "overwhelmed" would).
+const SURPRISE_MOODS: MoodId[] = ['bored', 'curious', 'content', 'restless'];
+
 export default function MoodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -71,6 +77,23 @@ export default function MoodScreen() {
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
     }
+  };
+
+  // "I had to explore what mood I am in" was the exact friction reported —
+  // for anyone who'd rather not sit with that question, skip it entirely:
+  // pick a reasonable mood for them and move straight on, same as tapping a
+  // tile themselves would. Context screen still asks for confirmation via
+  // its own "Make my plan" button, so this never generates anything without
+  // one more deliberate tap.
+  const surpriseMe = () => {
+    const pickId = SURPRISE_MOODS[Math.floor(Math.random() * SURPRISE_MOODS.length)];
+    setMood(pickId);
+    setFreeformDescription('');
+    for (const cat of categories) toggleCategory(cat);
+    setOtherOpen(false);
+    setShowCrisisNotice(false);
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    router.push('/home/context');
   };
 
   const proceedWithFreeform = (text: string) => {
@@ -165,6 +188,16 @@ export default function MoodScreen() {
         <Text style={styles.sub}>
           Pick what fits — one or a few. No wrong answers.
         </Text>
+
+        <Pressable
+          onPress={surpriseMe}
+          accessibilityRole="button"
+          accessibilityLabel="Not sure — surprise me"
+          style={({ pressed }) => [styles.surpriseRow, pressed && { opacity: 0.8 }]}
+        >
+          <Icon name="inspired" size={16} color={colors.coralDeep} strokeWidth={1.9} />
+          <Text style={styles.surpriseText}>Not sure? Surprise me</Text>
+        </Pressable>
 
         <View style={styles.grid}>
           {MOODS.map((m) => {
@@ -325,7 +358,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 8,
   },
-  sub: { fontSize: 15.5, color: colors.inkSoft, ...font.regular, lineHeight: 22, marginBottom: 22 },
+  sub: { fontSize: 15.5, color: colors.inkSoft, ...font.regular, lineHeight: 22, marginBottom: 14 },
+  surpriseRow: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: colors.coralTint,
+    borderRadius: radius.pill,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+  },
+  surpriseText: { fontSize: 13.5, ...font.semibold, color: colors.coralDeep },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

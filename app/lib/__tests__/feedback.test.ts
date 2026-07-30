@@ -8,6 +8,7 @@
 import {
   clearFeedback,
   getFeedbackWeights,
+  getHistoryEntries,
   getPersonalSignal,
   getPersonalStats,
   personalizationNote,
@@ -197,5 +198,45 @@ describe('getPersonalStats', () => {
     await recordShown(['a'], 'restless');
     const stats = await getPersonalStats();
     expect(stats.streakDays).toBe(1);
+  });
+});
+
+describe('getHistoryEntries', () => {
+  it('returns nothing for an empty log', async () => {
+    const entries = await getHistoryEntries();
+    expect(entries).toEqual([]);
+  });
+
+  it('excludes plain "shown" and "rejected" events', async () => {
+    await recordShown(['hike'], 'restless');
+    await recordRejected(['hike'], 'restless');
+    const entries = await getHistoryEntries();
+    expect(entries).toEqual([]);
+  });
+
+  it('includes saves and explicit thumbs feedback, newest first', async () => {
+    await recordAccepted('hike', 'restless');
+    await new Promise((r) => setTimeout(r, 2));
+    await recordExplicitFeedback('read', 'content', true);
+    const entries = await getHistoryEntries();
+    expect(entries.map((e) => e.id)).toEqual(['read', 'hike']);
+    expect(entries[0].event).toBe('thumbsUp');
+    expect(entries[1].event).toBe('accepted');
+  });
+
+  it('resolves a real dataset title, and reconstructs an AI-composed one from its slug', async () => {
+    await recordAccepted('a-10-minute-walk-without-your-phone', 'restless');
+    await recordAccepted('ai:cook-a-three-ingredient-midnight-snack', 'bored');
+    const entries = await getHistoryEntries();
+    const byId = new Map(entries.map((e) => [e.id, e.title]));
+    expect(byId.get('a-10-minute-walk-without-your-phone')).toBe('A 10-minute walk without your phone');
+    expect(byId.get('ai:cook-a-three-ingredient-midnight-snack')).toBe('Cook A Three Ingredient Midnight Snack');
+  });
+
+  it('collapses repeats of the same activity/mood/event into one entry', async () => {
+    await recordAccepted('hike', 'restless');
+    await recordAccepted('hike', 'restless');
+    const entries = await getHistoryEntries();
+    expect(entries.length).toBe(1);
   });
 });

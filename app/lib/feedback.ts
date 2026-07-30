@@ -26,7 +26,7 @@
    ============================================================ */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MoodId } from '../data/activities';
+import { ACTIVITIES, MoodId } from '../data/activities';
 import { syncFeedbackEvent } from './sync';
 
 export type FeedbackEvent = 'shown' | 'accepted' | 'rejected' | 'thumbsUp' | 'thumbsDown';
@@ -257,4 +257,61 @@ export async function getFeedbackWeights(mood: MoodId): Promise<Map<string, numb
   }
 
   return weights;
+}
+
+/** A real, readable title for a feedback-log entry's activity id — looked
+ * up in the static dataset for a normal activity, or reconstructed from
+ * the slug for an AI-composed one (see aiPlan.ts's slugify — "ai:" ids
+ * encode the title as a hyphenated, lowercased slug, which is the closest
+ * thing to the original title we keep once a plan has moved on). */
+function titleForId(id: string): string {
+  if (id.startsWith('ai:')) {
+    const slug = id.slice(3);
+    return slug
+      .split('-')
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+  const found = ACTIVITIES.find((a) => a.id === id);
+  return found?.t ?? 'An activity';
+}
+
+export type HistoryEventKind = 'accepted' | 'thumbsUp' | 'thumbsDown';
+
+export interface HistoryEntry {
+  id: string;
+  title: string;
+  mood: MoodId;
+  event: HistoryEventKind;
+  at: number;
+}
+
+/** "Things you did, completed, or liked" — the same on-device log that
+ * quietly powers feedback weights, made visible so the learning this app
+ * claims to do is actually auditable, not just asserted (same spirit as
+ * personalizationNote above). Deliberately excludes plain "shown" and
+ * "rejected" events: a full log of everything a person ever glanced at or
+ * reshuffled away would read as surveillance, not a helpful history —
+ * this only surfaces the moments they actively chose something. */
+export async function getHistoryEntries(limit = 20): Promise<HistoryEntry[]> {
+  const log = await readLog();
+  const relevant = log.filter(
+    (r): r is FeedbackRecord & { event: HistoryEventKind } =>
+      r.event === 'accepted' || r.event === 'thumbsUp' || r.event === 'thumbsDown'
+  );
+  relevant.sort((a, b) => b.at - a.at);
+  const seen = new Set<string>();
+  const out: HistoryEntry[] = [];
+  for (const r of relevant) {
+    // Same activity/mood/event can appear more than once (e.g. saved, then
+    // unsaved-and-resaved later) — keep only the most recent instance so
+    // the list reads as a timeline of distinct moments, not a repeat log.
+    const key = `${r.id}|${r.mood}|${r.event}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: r.id, title: titleForId(r.id), mood: r.mood, event: r.event, at: r.at });
+    if (out.length >= limit) break;
+  }
+  return out;
 }

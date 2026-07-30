@@ -17,7 +17,7 @@ import { Icon } from '../../components/Icon';
 import { usePlan } from '../../context/PlanContext';
 import { ACTIVITIES, MOODS } from '../../data/activities';
 import { SHOW_BYOK_AI_UI } from '../../lib/betaConfig';
-import { getPersonalStats, PersonalStats } from '../../lib/feedback';
+import { getHistoryEntries, getPersonalStats, HistoryEntry, PersonalStats } from '../../lib/feedback';
 import { colors, font, fontDisplay, radius } from '../../lib/theme';
 import { MAX_AI_PLANS_PER_DAY, MAX_EVENTS_LOOKUPS_PER_DAY } from '../../lib/usageLimits';
 
@@ -207,6 +207,7 @@ export default function AboutScreen() {
       </View>
 
       <YourPatterns />
+      <RecentActivity />
 
       <View style={styles.card}>
         <Text style={styles.cardH}>How it works</Text>
@@ -392,6 +393,79 @@ function YourPatterns() {
   );
 }
 
+function formatRelativeTime(at: number): string {
+  const diffMs = Date.now() - at;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+const HISTORY_EVENT_META: Record<
+  HistoryEntry['event'],
+  { icon: 'heart-filled' | 'thumb-up' | 'thumb-down'; color: string; label: string }
+> = {
+  accepted: { icon: 'heart-filled', color: colors.coral, label: 'Saved' },
+  thumbsUp: { icon: 'thumb-up', color: colors.sageDeep, label: 'Good call' },
+  thumbsDown: { icon: 'thumb-down', color: colors.inkFaint, label: 'Not a fit' },
+};
+
+/** The actual, timestamped answer to "how would I know AI/WhatNow is
+ * learning from me" — this is the same on-device log that feeds
+ * lib/feedback.ts's scoring weights, just made visible instead of only
+ * ever acting invisibly in the background. Only shows real moments
+ * someone saved something or gave explicit thumbs-up/down; see
+ * getHistoryEntries for why plain "shown"/"rejected" events are left out. */
+function RecentActivity() {
+  const [entries, setEntries] = React.useState<HistoryEntry[] | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getHistoryEntries(20).then((e) => {
+      if (!cancelled) setEntries(e);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!entries || entries.length === 0) return null;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.acctHeaderRow}>
+        <Icon name="clock" size={18} color={colors.ink} strokeWidth={1.7} />
+        <Text style={styles.cardH}>Recent activity</Text>
+      </View>
+      <Text style={[styles.cardP, { marginBottom: 12 }]}>
+        Every save and thumbs-up/down here is what actually shapes your future plans — this is
+        that log, not a separate claim.
+      </Text>
+      {entries.map((e, i) => {
+        const meta = HISTORY_EVENT_META[e.event];
+        const moodMeta = MOODS.find((m) => m.id === e.mood);
+        return (
+          <View key={`${e.id}-${e.event}-${e.at}-${i}`} style={styles.historyRow}>
+            <Icon name={meta.icon} size={16} color={meta.color} strokeWidth={1.9} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.historyTitle}>{e.title}</Text>
+              <Text style={styles.historyMeta}>
+                {meta.label}
+                {moodMeta ? ` · felt ${moodMeta.word}` : ''} · {formatRelativeTime(e.at)}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function FlashLabel({
   flashed,
   flashedText,
@@ -493,6 +567,16 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 22, ...fontDisplay.bold, color: colors.ink },
   statLabel: { fontSize: 11, color: colors.inkFaint, ...font.medium, textAlign: 'center', marginTop: 2 },
   topMoodRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  historyTitle: { fontSize: 14, ...font.semibold, color: colors.ink },
+  historyMeta: { fontSize: 12, color: colors.inkFaint, ...font.regular, marginTop: 1 },
   step: { flexDirection: 'row', gap: 12, marginBottom: 14, alignItems: 'flex-start' },
   stepNum: {
     width: 28,
