@@ -14,10 +14,11 @@ import {
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../context/AuthContext';
 import { PlanProvider } from '../context/PlanContext';
+import { colors } from '../lib/theme';
 
 // NOTE: SplashScreen.preventAutoHideAsync() is deliberately NOT called here.
 // On this SDK 57 / New Architecture (Fabric, bridgeless) build, calling it
@@ -69,24 +70,63 @@ export default function RootLayout() {
     return <View style={{ flex: 1, backgroundColor: '#FDF6EE' }} />;
   }
 
+  // `index` is a lightweight <Redirect> (see app/index.tsx) that decides
+  // onboarding vs. tabs — expo-router needs an actual route registered for
+  // the literal "/" path, which `initialRouteName` alone doesn't cover (that
+  // only affects in-navigator fallbacks, not the app's initial launch URL —
+  // this was the actual cause of landing on "Unmatched Route" at cold launch).
+  const stack = (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <PlanProvider>
           <StatusBar style="dark" />
-          {/* `index` is a lightweight <Redirect> (see app/index.tsx) that
-              decides onboarding vs. tabs — expo-router needs an actual route
-              registered for the literal "/" path, which `initialRouteName`
-              alone doesn't cover (that only affects in-navigator fallbacks,
-              not the app's initial launch URL — this was the actual cause
-              of landing on "Unmatched Route" at cold launch). */}
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
+          {/* Every layout in this app (mood grid percentages, the bottom tab
+              bar, card widths) was built for a phone-width viewport. Wide
+              desktop browser windows are how this gets tested during the
+              iOS TestFlight wait, and without a cap those percentage-based
+              layouts stretch to fill the whole window — the mood tiles blow
+              up into huge near-empty squares instead of the compact grid
+              they're designed to be. Capping to a phone-sized column on web
+              only (native is completely untouched) fixes that without
+              touching any per-screen layout code. */}
+          {Platform.OS === 'web' ? (
+            // The 100vh values are real CSS on web (where this branch is the
+            // only one that ever renders) but not part of RN's ViewStyle
+            // types — cast at the usage site so the shared style objects
+            // below stay normally typed everywhere else.
+            <View style={[styles.webBackdrop, { minHeight: '100vh' } as any]}>
+              <View style={[styles.webPhone, { height: '100vh' } as any]}>{stack}</View>
+            </View>
+          ) : (
+            stack
+          )}
         </PlanProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  webBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.ink,
+  },
+  webPhone: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: 900,
+    backgroundColor: colors.bg,
+    overflow: 'hidden',
+  },
+});

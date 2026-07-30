@@ -389,12 +389,17 @@ function AccountCard() {
     }
   };
 
+  // Google/Apple are meant to be a single tap, unlike the email form above —
+  // gating them behind the same separate checkbox used to mean tapping
+  // "Continue with Google" with the checkbox (easy to miss, off-screen on
+  // some layouts) still unchecked did visibly nothing beyond a small error
+  // line, which read as "Google sign-in is broken." Consent is instead
+  // implied by tapping a button whose caption says exactly that (see the
+  // "By continuing..." line under these buttons) — same pattern used by
+  // most apps' social sign-in rows. signInWithGoogle/signInWithApple still
+  // record the actual consent version once the provider confirms success.
   const onGoogle = async () => {
     setError(null);
-    if (mode === 'signUp' && !consented) {
-      setError('Please accept the privacy policy to create an account.');
-      return;
-    }
     setBusy(true);
     try {
       const result = await signInWithGoogle(PRIVACY_POLICY_VERSION);
@@ -406,10 +411,6 @@ function AccountCard() {
 
   const onApple = async () => {
     setError(null);
-    if (mode === 'signUp' && !consented) {
-      setError('Please accept the privacy policy to create an account.');
-      return;
-    }
     setBusy(true);
     try {
       const result = await signInWithApple(PRIVACY_POLICY_VERSION);
@@ -636,6 +637,13 @@ function AccountCard() {
           style={styles.appleBtn}
           onPress={onApple}
         />
+      ) : null}
+
+      {mode === 'signUp' ? (
+        <Text style={styles.socialConsentNote}>
+          By continuing with Google{appleAvailable ? ' or Apple' : ''}, you agree to the Privacy
+          section below.
+        </Text>
       ) : null}
 
       <Text style={styles.acctSkipNote}>
@@ -945,6 +953,13 @@ const styles = StyleSheet.create({
   socialBtnText: { fontSize: 14.5, ...font.semibold, color: colors.ink },
   appleBtn: { width: '100%', height: 46, marginBottom: 10 },
   acctSkipNote: { fontSize: 12.5, color: colors.inkFaint, marginTop: 12, lineHeight: 18 },
+  socialConsentNote: {
+    fontSize: 12,
+    color: colors.inkFaint,
+    marginTop: 10,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
   acctBtn: {
     flexDirection: 'row',
     alignItems: 'center',
