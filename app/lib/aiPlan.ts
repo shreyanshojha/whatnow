@@ -135,7 +135,14 @@ function buildPrompt(
   if (nearbyName) {
     lines.push(`They're roughly in ${nearbyName}.`);
   }
+  // Real venue names (from OpenStreetMap/Google Places) are a nice-to-have,
+  // not a requirement for a good answer — the free map API this list comes
+  // from can be temporarily unavailable, and the app should never get worse
+  // at giving specific, genuinely useful suggestions just because that one
+  // extra data source didn't come back this time. Three tiers, each asked
+  // to be as concrete as it honestly can be with what it actually knows:
   if (nearbyVenues.length > 0) {
+    // Tier 1: a live, real venue list — name from it specifically.
     const list = nearbyVenues.slice(0, 8).map((v) => `${v.name} (${v.kind})`).join(', ');
     lines.push(
       `Real, actually-nearby places you can name specifically: ${list}. For any outdoor, ` +
@@ -144,6 +151,33 @@ function buildPrompt(
         `concrete and genuinely useful). Never invent a place name that isn't in this list. ` +
         `Suggestions that are inherently about someone's own home (tidying, resting, a small ` +
         `private task) don't need a place name — don't force one in.`
+    );
+  } else if (nearbyName) {
+    // Tier 2: no live venue list right now, but a real neighborhood/city
+    // name — lean on your own general knowledge of that place instead of
+    // going generic, the same way you would if a person just asked you
+    // directly "what's there to do in ${nearbyName}?"
+    lines.push(
+      `There's no live nearby-venue list available this time, but you do know they're in ` +
+        `${nearbyName} — use your own general knowledge of that area (well-known parks, ` +
+        `streets, neighborhoods, or landmarks you're genuinely confident actually exist there) ` +
+        `to make outdoor or "go somewhere" suggestions feel like they're really about that ` +
+        `place, not a generic city. It's fine to reference a well-known public landmark, ` +
+        `street, or neighborhood you're confident about; don't invent or guess the name of a ` +
+        `specific small business you're not sure is real. For a suggestion like "go for a ` +
+        `walk," still give it real shape even without a named destination — a direction, a ` +
+        `loop, a distance, or a length of time ("a 20-minute loop around the block" beats ` +
+        `"take a walk"). Suggestions inherently about someone's own home don't need a place ` +
+        `reference at all — don't force one in.`
+    );
+  } else {
+    // Tier 3: no location info at all — the fix isn't a fake place, it's
+    // making the action itself unmistakably concrete instead.
+    lines.push(
+      `No location is available this time, so skip place-specific suggestions entirely — ` +
+        `don't guess a city or invent a place. Instead make the action itself unmistakably ` +
+        `concrete: specific numbers, a specific shape or sequence, a specific short time ` +
+        `box, so it never reads as generic advice just because it's not tied to a real spot.`
     );
   }
   if (patternHint) {

@@ -52,6 +52,20 @@ const CAT_TO_AMENITY: Record<string, string[]> = {
   food: ['restaurant', 'bar', 'cafe'],
 };
 
+// Friendly, singular phrasing for the generic-tip fallback below — only
+// needs the amenity kinds CAT_TO_AMENITY actually references.
+const AMENITY_GENERIC_LABEL: Record<string, string> = {
+  gym: 'a gym',
+  park: 'a park',
+  museum: 'a museum',
+  cinema: 'a movie theater',
+  bookstore: 'a bookstore',
+  library: 'a library',
+  cafe: 'a café',
+  restaurant: 'a restaurant',
+  bar: 'a bar',
+};
+
 function formatDistance(m: number): string {
   return m < 1000 ? `${m}m away` : `${(m / 1000).toFixed(1)}km away`;
 }
@@ -144,7 +158,17 @@ export function ActivityCard({
         (v) => matchingKinds.includes(v.kind) && (a.place === 'outdoor' || a.place === 'either' || v.kind !== 'park')
       )
     : undefined;
-  const showTip = !!matchedVenue;
+  // The venue list (Overpass/Google Places) can come back empty even when
+  // we still know roughly where someone is (reverse-geocoding the
+  // neighborhood name is a separate, more reliable lookup) — e.g. the free
+  // map API being temporarily overloaded shouldn't mean this card falls
+  // all the way back to zero place context. Naming the real neighborhood
+  // next to a generic venue type ("a park nearby in Nob Hill") is still
+  // honest and still more useful than nothing, without inventing a
+  // specific business that might not exist.
+  const genericVenueLabel = matchingKinds ? AMENITY_GENERIC_LABEL[matchingKinds[0]] : undefined;
+  const showGenericTip = !matchedVenue && !!genericVenueLabel && !!nearby?.placeName;
+  const showTip = !!matchedVenue || showGenericTip;
 
   return (
     <Animated.View
@@ -210,6 +234,14 @@ export function ActivityCard({
           <Icon name="pin" size={13} color={colors.inkSoft} strokeWidth={1.9} />
           <Text style={styles.tip}>
             Try <Text style={styles.tipStrong}>{matchedVenue.name}</Text> — {formatDistance(matchedVenue.distanceM)}
+          </Text>
+        </View>
+      ) : showGenericTip ? (
+        <View style={styles.tipRow}>
+          <Icon name="pin" size={13} color={colors.inkSoft} strokeWidth={1.9} />
+          <Text style={styles.tip}>
+            Worth checking for <Text style={styles.tipStrong}>{genericVenueLabel}</Text> around{' '}
+            <Text style={styles.tipStrong}>{nearby!.placeName}</Text>
           </Text>
         </View>
       ) : null}
