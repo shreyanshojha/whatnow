@@ -4,8 +4,22 @@
    Structured APIs (Ticketmaster, OpenStreetMap) only cover what they
    cover — a lot of real local life is unlisted there: a neighborhood
    meetup on Eventbrite, a pop-up market, a movie that just opened at
-   the theater across town. This module asks Claude to actually search
+   the theater across town, a genuinely great restaurant nobody's put
+   on a "best of" list yet. This module asks Claude to actually search
    the live web for that and hand back a short, structured list.
+
+   The point isn't just "list nearby things" — it's discovery: surface
+   something a person didn't already know was there, weighted toward
+   specific/interesting/lesser-known picks over the first obvious chain
+   result, genuinely mixed across categories (not just events + movies),
+   and honest about what's actually open or happening right now rather
+   than just whatever's physically closest.
+
+   A first search is intentionally broad (see buildPrompt). Once results
+   are in, the Plan screen can offer one lightweight, category-relevant
+   follow-up ("craving a cuisine?" / "in the mood for a genre?") and
+   re-run this with `refineHint` set — see PlanContext's lookOnlineNearby
+   and plan.tsx's LookOnlineNearby component.
 
    Same bring-your-own-key posture as lib/aiPlan.ts: this calls the
    Anthropic API directly from the device with the person's own key
@@ -24,7 +38,7 @@ import { SUPABASE_URL } from './supabase';
 export interface NearbyResult {
   name: string;
   blurb: string;
-  category: 'event' | 'movie';
+  category: 'event' | 'movie' | 'restaurant' | 'discover';
   url: string | null;
 }
 
@@ -48,36 +62,80 @@ const DEFAULT_TIMEOUT = 25000;
 // tokens) — keep a single request's blast radius small and predictable.
 const MAX_SEARCHES = 4;
 
-function buildPrompt(placeName: string | null): string {
+function buildPrompt(placeName: string | null, nowLabel: string, refineHint?: string): string {
   const where = placeName
     ? `near "${placeName}"`
     : 'nearby (no specific place name is available, so search broadly for ' +
-      'well-known local event listings and mainstream new movie releases instead ' +
-      'of anything hyper-local)';
+      'well-known local listings instead of anything hyper-local)';
 
-  return [
-    `Search the live web for real, currently happening things ${where}.`,
-    `Find 5 to 8 results total, split across two kinds:`,
-    `1) Local events, meetups, or pop-ups happening in the next week or so — ` +
-      `check sources like Eventbrite, Meetup, local venue sites, and local news, ` +
-      `not just well-known ticketing platforms. Small or under-the-radar is great, but ` +
-      `every result must be something a random stranger to the area could actually show ` +
-      `up to and enjoy: a concert, a market, an art walk, a comedy show, a class or ` +
-      `workshop, a tasting, a fair. Hard exclude anything membership-only, invite-only, ` +
-      `or restricted to a specific organization's members (homeowners'/neighborhood ` +
-      `associations, private clubs, alumni groups, work meetups) — if attending requires ` +
-      `belonging to a group the person isn't already in, leave it out. Also skip routine ` +
-      `civic maintenance (street sweeping, utility notices) — that's not an activity.`,
-    `2) Specific movies that are newly released and currently playing in theaters ` +
-      `${placeName ? `near "${placeName}"` : 'right now'}. "name" must be the movie's ` +
-      `actual title, never a theater's name — the blurb can mention where it's playing.`,
-    `For each result give exactly: "name" (short), "blurb" (one plain sentence, ` +
-      `no hype), "category" (the literal string "event" or "movie"), and "url" ` +
-      `(a real URL from your search results, or null if you don't have a genuine one — ` +
-      `never invent or guess a URL).`,
-    `Respond with ONLY a JSON array of objects with those four fields — no prose, ` +
-      `no markdown code fences, nothing before or after the array.`,
-  ].join('\n');
+  const lines: string[] = [];
+  lines.push(`It's currently ${nowLabel}. Search the live web for real things ${where} worth doing right now.`);
+  lines.push(
+    `The whole point of this feature is discovery — help someone find something genuinely ` +
+      `interesting nearby that they probably don't already know about, not the first obvious ` +
+      `chain restaurant or the one big event everyone already sees on a quick search. Favor ` +
+      `specific, real, slightly off-the-beaten-path picks — a well-reviewed independent ` +
+      `restaurant, a neighborhood night market, a pop-up, a small gallery or exhibit, a food ` +
+      `hall, a scenic spot a local would actually recommend — over generic or corporate ones. ` +
+      `Never invent one to fill this out; if you're not confident it's real, keep searching or ` +
+      `leave it out.`
+  );
+  lines.push(
+    `Keep everything within a comfortable range of ${placeName ?? 'that area'} — think a short ` +
+      `walk or a quick drive, not a destination trip across town. Among things that are all ` +
+      `reasonably close, pick the most interesting one, not just whichever happens to be nearest ` +
+      `on a map.`
+  );
+  lines.push(
+    `Time matters as much as distance: only include things realistically open or actually ` +
+      `happening at ${nowLabel} — check real hours/dates with search rather than assuming. Skip ` +
+      `anything already closed, already over, or not opening for hours yet. Late at night, lean ` +
+      `toward what's genuinely open then (late-night food, a bar, a 24-hour spot) instead of ` +
+      `daytime-only places; early morning, lean toward what actually opens early.`
+  );
+  lines.push(
+    `Find 6 to 9 results spread across a real MIX of these four kinds — don't let it collapse ` +
+      `into just one or two:`
+  );
+  lines.push(
+    `- "restaurant": a specific, real restaurant, food stall, or food hall worth trying right ` +
+      `now — prioritize distinctive or lesser-known spots with genuinely good reputations over chains.`
+  );
+  lines.push(
+    `- "event": a real event, meetup, pop-up, night market, art walk, class, tasting, or fair ` +
+      `happening now or in the next week. Hard exclude anything membership-only, invite-only, or ` +
+      `restricted to a specific organization's members (HOAs, private clubs, alumni groups, work ` +
+      `meetups). Skip routine civic notices (street sweeping, utility work) — not an activity.`
+  );
+  lines.push(
+    `- "movie": a specific movie newly released and currently playing in theaters nearby — ` +
+      `"name" must be the movie's actual title, never a theater's name.`
+  );
+  lines.push(
+    `- "discover": anything else genuinely worth knowing about nearby that doesn't fit the ` +
+      `above — a scenic viewpoint, a small museum or gallery, an unusual shop, a landmark, a ` +
+      `walk or trail, a market. This is the "things you didn't know were here" bucket.`
+  );
+  if (refineHint && refineHint.trim()) {
+    lines.push(
+      `The person just asked for something more specific: "${refineHint.trim()}." Bias your ` +
+        `picks — especially any restaurant or movie results — toward that, while keeping the ` +
+        `same mix and honesty rules above. If you can't find a good real match for it, return ` +
+        `fewer results rather than forcing a bad fit.`
+    );
+  }
+  lines.push(
+    `For each result give exactly: "name" (short, the actual place/event/movie name — never a ` +
+      `theater name for a movie), "blurb" (one plain, specific sentence about what makes it worth ` +
+      `going, not hype), "category" (the literal string "event", "movie", "restaurant", or ` +
+      `"discover"), and "url" (a real URL from your search results, or null if you don't have a ` +
+      `genuine one — never invent or guess a URL).`
+  );
+  lines.push(
+    `Respond with ONLY a JSON array of objects with those four fields — no prose, no markdown ` +
+      `code fences, nothing before or after the array.`
+  );
+  return lines.join('\n');
 }
 
 function extractJsonArray(text: string): unknown[] | null {
@@ -99,12 +157,14 @@ function extractJsonArray(text: string): unknown[] | null {
   }
 }
 
+const VALID_RESULT_CATS = new Set(['event', 'movie', 'restaurant', 'discover']);
+
 function validateResult(raw: unknown): NearbyResult | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.name !== 'string' || !r.name.trim()) return null;
   if (typeof r.blurb !== 'string' || !r.blurb.trim()) return null;
-  if (r.category !== 'event' && r.category !== 'movie') return null;
+  if (typeof r.category !== 'string' || !VALID_RESULT_CATS.has(r.category)) return null;
   let url: string | null = null;
   if (typeof r.url === 'string' && /^https?:\/\/\S+$/.test(r.url.trim())) {
     url = r.url.trim();
@@ -112,15 +172,17 @@ function validateResult(raw: unknown): NearbyResult | null {
   return {
     name: r.name.trim().slice(0, 90),
     blurb: r.blurb.trim().slice(0, 200),
-    category: r.category,
+    category: r.category as NearbyResult['category'],
     url,
   };
 }
 
 /**
- * Ask Claude to search the web for real nearby events + new movies. Returns
- * null on any failure — no key, network error, timeout, or a response that
- * doesn't parse into at least one valid result. Never throws.
+ * Ask Claude to search the web for real, currently-open/happening nearby
+ * things — restaurants, events, movies, and general "didn't know this was
+ * here" discoveries (see buildPrompt). Returns null on any failure — no
+ * key, network error, timeout, or a response that doesn't parse into at
+ * least one valid result. Never throws.
  */
 export async function searchNearby(
   config: NearbySearchConfig,
@@ -128,7 +190,12 @@ export async function searchNearby(
   /** Called (shared-key path only) when the request fails specifically
    * because today's shared beta AI cap was hit — see the matching param
    * on generateAiPlan in lib/aiPlan.ts. */
-  onCapped?: () => void
+  onCapped?: () => void,
+  /** A follow-up preference from a second-round question the Plan screen
+   * asked after the first search came back — e.g. "Italian food" if a
+   * restaurant result showed up, or "something funny" for a movie result.
+   * See plan.tsx's LookOnlineNearby. Undefined for the first search. */
+  refineHint?: string
 ): Promise<NearbyResult[] | null> {
   const hasByok = !!config.apiKey && !!config.apiKey.trim();
   const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
@@ -137,10 +204,20 @@ export async function searchNearby(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_TIMEOUT);
 
+  // Local clock time, in the person's own words ("Wednesday, 2:45 PM") —
+  // the whole point of passing this is so the model actually reasons about
+  // what's plausibly open/happening right now instead of just listing
+  // whatever's closest on a map (see buildPrompt).
+  const nowLabel = new Date().toLocaleString(undefined, {
+    weekday: 'long',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
   const system =
     'You search the live web and return only clean, valid JSON — no prose, ' +
-    'no markdown, and never a fabricated URL.';
-  const messages = [{ role: 'user', content: buildPrompt(placeName) }];
+    'no markdown, and never a fabricated URL or a fabricated place.';
+  const messages = [{ role: 'user', content: buildPrompt(placeName, nowLabel, refineHint) }];
   const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: MAX_SEARCHES }];
 
   try {
@@ -157,7 +234,7 @@ export async function searchNearby(
         },
         body: JSON.stringify({
           model: config.model ?? DEFAULT_MODEL,
-          max_tokens: 1500,
+          max_tokens: 1800,
           system,
           messages,
           tools,
@@ -171,7 +248,7 @@ export async function searchNearby(
           'content-type': 'application/json',
           Authorization: `Bearer ${config.sharedAccessToken!.trim()}`,
         },
-        body: JSON.stringify({ kind: 'nearby_search', max_tokens: 1500, system, messages, tools }),
+        body: JSON.stringify({ kind: 'nearby_search', max_tokens: 1800, system, messages, tools }),
       });
     }
 

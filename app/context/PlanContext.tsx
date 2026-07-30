@@ -161,7 +161,10 @@ interface PlanContextValue {
   // "Look online nearby" web search (optional, bring-your-own-key — same key as AI planning)
   nearbySearchResults: NearbyResult[] | null;
   nearbySearchLoading: boolean;
-  lookOnlineNearby: () => Promise<void>;
+  /** `refineHint` — a follow-up preference from a second-round question the
+   * Plan screen asks after the first search comes back (e.g. "Italian
+   * food"). Omitted for the first search. See lib/nearbySearch.ts. */
+  lookOnlineNearby: (refineHint?: string) => Promise<void>;
   // plan
   lastPlan: PlanCard[];
   planSource: PlanSource;
@@ -603,12 +606,15 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   }, [lastPlan, makePlan]);
 
   /** "Look online nearby" — searches the live web (via the same Anthropic
-   * key used for AI planning) for real, currently-happening local events
-   * and new movies that structured APIs like Ticketmaster/OpenStreetMap
-   * don't cover. Fully optional: does nothing without a key, silently
-   * clears results on any failure so the section just disappears rather
-   * than showing something broken. See lib/nearbySearch.ts. */
-  const lookOnlineNearby = useCallback(async (): Promise<void> => {
+   * key used for AI planning) for real, currently-open/happening local
+   * restaurants, events, movies, and general discoveries that structured
+   * APIs like Ticketmaster/OpenStreetMap don't cover. Fully optional: does
+   * nothing without a key, silently clears results on any failure so the
+   * section just disappears rather than showing something broken. See
+   * lib/nearbySearch.ts. `refineHint` carries a second-round preference
+   * (e.g. "Thai food") from a follow-up question the Plan screen asks
+   * after the first search — see plan.tsx's LookOnlineNearby. */
+  const lookOnlineNearby = useCallback(async (refineHint?: string): Promise<void> => {
     const byokReady = !!aiApiKey && (await canUseNearbySearchToday());
     const useShared = !byokReady && sharedAiAvailable;
     if (!byokReady && !useShared) {
@@ -622,7 +628,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       const results = await searchNearby(
         config,
         nearbyRef.current?.placeName ?? null,
-        useShared ? () => { cappedThisAttempt = true; } : undefined
+        useShared ? () => { cappedThisAttempt = true; } : undefined,
+        refineHint
       );
       setNearbySearchResults(results);
       // Always reset, not just on the shared path — otherwise a stale

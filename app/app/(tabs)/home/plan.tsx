@@ -293,11 +293,35 @@ function NearbyRightNow({
   );
 }
 
-/** A web-search-backed complement to NearbyRightNow — surfaces unlisted local
- * events (Eventbrite meetups, pop-ups, anything a structured API wouldn't
- * carry) and newly-released movies playing nearby, via the same Anthropic
- * key used for AI planning (see lib/nearbySearch.ts). Starts collapsed as a
- * single button so it never looks like a broken, empty section. */
+const RESULT_ICON: Record<string, IconName> = {
+  movie: 'venue-cinema',
+  event: 'ticket',
+  restaurant: 'venue-restaurant',
+  discover: 'compass',
+};
+const CAT_FILTER_LABEL: Record<string, string> = {
+  event: 'Events',
+  movie: 'Movies',
+  restaurant: 'Food',
+  discover: 'Discover',
+};
+const RESULT_CATS = ['event', 'movie', 'restaurant', 'discover'] as const;
+
+// A quick, natural follow-up once real results are in — asking "any
+// preference?" before searching would just be a form; asking it after
+// someone's already seen a real restaurant or movie pick is a normal
+// question ("oh, any cuisine in mind?") that meaningfully narrows the next
+// search instead of adding friction up front. Shown at most once per
+// search — dismissing it or picking a chip both close it for this batch.
+const CUISINE_CHIPS = ['Italian', 'Mexican', 'Japanese', 'Indian', 'Thai', 'Something cozy'];
+const GENRE_CHIPS = ['Comedy', 'Action', 'Drama', 'Family-friendly', 'Horror', 'Documentary'];
+
+/** A web-search-backed complement to NearbyRightNow — surfaces real, currently
+ * open/happening restaurants, events, movies, and general local discoveries
+ * (things a structured API wouldn't carry, or wouldn't think to surface at
+ * all) via the same Anthropic key used for AI planning (see
+ * lib/nearbySearch.ts). Starts collapsed as a single button so it never
+ * looks like a broken, empty section. */
 function LookOnlineNearby({
   results,
   loading,
@@ -305,24 +329,46 @@ function LookOnlineNearby({
 }: {
   results: ReturnType<typeof usePlan>['nearbySearchResults'];
   loading: boolean;
-  onSearch: () => Promise<void>;
+  onSearch: (refineHint?: string) => Promise<void>;
 }) {
   const [searched, setSearched] = React.useState(false);
   // Purely a client-side view filter over whatever the search already
-  // returned — the search itself always asks for a balanced mix of both
-  // (see lib/nearbySearch.ts), this just lets someone narrow what they're
+  // returned — the search itself always asks for a mix (see
+  // lib/nearbySearch.ts), this just lets someone narrow what they're
   // looking at afterward without a second search or any backend change.
-  const [filter, setFilter] = React.useState<'all' | 'event' | 'movie'>('all');
+  const [filter, setFilter] = React.useState<'all' | (typeof RESULT_CATS)[number]>('all');
+  // Whether the one-time follow-up question ("craving a cuisine?" / "in the
+  // mood for a genre?") has already been shown-and-resolved for the current
+  // batch of results — reset on every fresh (non-refine) search.
+  const [followUpResolved, setFollowUpResolved] = React.useState(false);
 
   const handlePress = () => {
     setSearched(true);
     setFilter('all');
+    setFollowUpResolved(false);
     onSearch().catch(() => {});
   };
 
+  const handleRefine = (hint: string) => {
+    setFollowUpResolved(true);
+    setFilter('all');
+    onSearch(hint).catch(() => {});
+  };
+
   const visibleResults = results?.filter((r) => filter === 'all' || r.category === filter) ?? null;
-  const hasMovies = results?.some((r) => r.category === 'movie') ?? false;
-  const hasEvents = results?.some((r) => r.category === 'event') ?? false;
+  const presentCats = RESULT_CATS.filter((c) => results?.some((r) => r.category === c));
+  const hasRestaurants = presentCats.includes('restaurant');
+  const hasMoviesNow = presentCats.includes('movie');
+  // Restaurant takes priority over movie if a batch somehow has both — one
+  // question at a time, never a multi-part form.
+  const followUpKind: 'cuisine' | 'genre' | null =
+    !loading && searched && !followUpResolved && results && results.length > 0
+      ? hasRestaurants
+        ? 'cuisine'
+        : hasMoviesNow
+          ? 'genre'
+          : null
+      : null;
 
   return (
     <View style={styles.nearbySection}>
@@ -346,13 +392,13 @@ function LookOnlineNearby({
         <View style={styles.nearbyRow}>
           <ActivityIndicator size="small" color={colors.coralDeep} />
           <Text style={[styles.nearbyMeta, { marginLeft: 10 }]}>
-            Searching the web for events and new movies…
+            Searching the web for what's actually open right now…
           </Text>
         </View>
       ) : !searched ? (
         <Text style={styles.lookHint}>
-          Finds unlisted local events and new movies nearby — beyond what a structured API
-          would catch.
+          Finds real restaurants, events, movies, and hidden-gem spots nearby — things worth
+          discovering, not just what's closest.
         </Text>
       ) : results === null ? (
         <Text style={styles.lookHint}>
@@ -360,9 +406,9 @@ function LookOnlineNearby({
         </Text>
       ) : (
         <>
-          {hasMovies && hasEvents ? (
+          {presentCats.length > 1 ? (
             <View style={styles.lookFilterRow}>
-              {(['all', 'event', 'movie'] as const).map((f) => (
+              {(['all', ...presentCats] as const).map((f) => (
                 <Pressable
                   key={f}
                   onPress={() => setFilter(f)}
@@ -371,7 +417,7 @@ function LookOnlineNearby({
                   style={[styles.lookFilterChip, filter === f && styles.lookFilterChipActive]}
                 >
                   <Text style={[styles.lookFilterText, filter === f && styles.lookFilterTextActive]}>
-                    {f === 'all' ? 'All' : f === 'event' ? 'Events' : 'Movies'}
+                    {f === 'all' ? 'All' : CAT_FILTER_LABEL[f]}
                   </Text>
                 </Pressable>
               ))}
@@ -388,7 +434,7 @@ function LookOnlineNearby({
             >
               <View style={styles.nearbyIconWrap}>
                 <Icon
-                  name={r.category === 'movie' ? 'venue-cinema' : 'ticket'}
+                  name={RESULT_ICON[r.category] ?? 'pin'}
                   size={17}
                   color={colors.inkSoft}
                   strokeWidth={1.7}
@@ -400,6 +446,29 @@ function LookOnlineNearby({
               </View>
             </Pressable>
           ))}
+
+          {followUpKind ? (
+            <View style={styles.followUpBox}>
+              <Text style={styles.followUpQ}>
+                {followUpKind === 'cuisine' ? 'Craving a specific cuisine?' : 'In the mood for a genre?'}
+              </Text>
+              <View style={styles.followUpChipRow}>
+                {(followUpKind === 'cuisine' ? CUISINE_CHIPS : GENRE_CHIPS).map((chip) => (
+                  <Pressable
+                    key={chip}
+                    onPress={() => handleRefine(chip)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.followUpChip, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.followUpChipText}>{chip}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable onPress={() => setFollowUpResolved(true)} accessibilityRole="button">
+                <Text style={styles.followUpDismiss}>Not fussy — leave it</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       )}
     </View>
@@ -485,7 +554,7 @@ const styles = StyleSheet.create({
   },
   lookBtnText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
   lookHint: { fontSize: 13, color: colors.inkFaint, ...font.regular, lineHeight: 19 },
-  lookFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  lookFilterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   lookFilterChip: {
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -496,6 +565,24 @@ const styles = StyleSheet.create({
   lookFilterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   lookFilterText: { fontSize: 12, ...font.semibold, color: colors.inkFaint },
   lookFilterTextActive: { color: colors.white },
+  followUpBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  followUpQ: { fontSize: 13.5, ...font.semibold, color: colors.ink, marginBottom: 8 },
+  followUpChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 },
+  followUpChip: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.coral,
+    backgroundColor: colors.coralTint,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  followUpChipText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
+  followUpDismiss: { fontSize: 12.5, color: colors.inkFaint, ...font.medium },
   nearbyRow: {
     flexDirection: 'row',
     alignItems: 'center',
