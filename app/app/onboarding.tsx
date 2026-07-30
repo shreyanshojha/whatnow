@@ -1,12 +1,32 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Dimensions,
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, IconName } from '../components/Icon';
 import { setCompletedOnboarding } from '../lib/onboarding';
 import { colors, font, fontDisplay, radius } from '../lib/theme';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+// A starting guess only — corrected the moment the carousel's own wrapper
+// actually lays out (see onLayout below). On native this is the real
+// screen width, so nothing changes there. On web this app is capped to a
+// phone-width column (see app/_layout.tsx's webPhone wrapper) that's
+// usually much narrower than the full browser window Dimensions.get
+// reports — sizing each slide and every scrollTo offset off the wrong
+// (much larger) window width was why "Next" silently did nothing on web:
+// it was scrolling by a whole browser-window's worth of pixels inside a
+// ~480px-wide viewport, which either overshot every slide or never moved
+// the visible frame at all, forcing people to tap Skip instead.
+const { width: INITIAL_WIDTH } = Dimensions.get('window');
 
 interface Slide {
   icons: IconName[];
@@ -52,13 +72,19 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = React.useRef<ScrollView>(null);
   const [index, setIndex] = React.useState(0);
+  const [pageWidth, setPageWidth] = React.useState(INITIAL_WIDTH);
 
   const finish = React.useCallback(() => {
     setCompletedOnboarding().finally(() => router.replace('/(tabs)/home'));
   }, [router]);
 
+  const onCarouselLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && w !== pageWidth) setPageWidth(w);
+  };
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    const i = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
     if (i !== index) setIndex(i);
   };
 
@@ -67,7 +93,7 @@ export default function OnboardingScreen() {
       finish();
       return;
     }
-    scrollRef.current?.scrollTo({ x: (index + 1) * SCREEN_W, animated: true });
+    scrollRef.current?.scrollTo({ x: (index + 1) * pageWidth, animated: true });
   };
 
   const isLast = index === SLIDES.length - 1;
@@ -90,10 +116,11 @@ export default function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScroll}
+        onLayout={onCarouselLayout}
         style={{ flex: 1 }}
       >
         {SLIDES.map((slide, i) => (
-          <View key={i} style={[styles.slide, { width: SCREEN_W }]}>
+          <View key={i} style={[styles.slide, { width: pageWidth }]}>
             <View style={[styles.artWrap, { backgroundColor: slide.tint }]}>
               <View style={styles.iconRow}>
                 {slide.icons.map((name, ii) => (

@@ -146,20 +146,44 @@ function kindOf(tags: Record<string, string>): string | null {
   return null;
 }
 
-// Split into a few smaller queries run in parallel rather than one big
-// union query. A single query covering all 9 amenity kinds reliably hit
-// Overpass's own server-side timeout (504, ~8-9s) in dense urban areas —
-// confirmed against Russian Hill, SF, which has enough of each amenity
-// kind within 1500m that the combined scan never finished. Each smaller
-// group finishes fast enough on its own; running them in parallel keeps
-// total wall time close to the slowest single group, not the sum of all.
-// Each entry is a ready-to-use Overpass node-filter fragment (minus the
-// `(around:...)` clause, added per-request below).
+// Public Overpass instances all serve the same underlying OSM data — falling
+// back to a second one when the first is overloaded meaningfully improves
+// real-world success instead of silently showing "nothing nearby." Confirmed
+// live in production: overpass-api.de returned a flat 503 on every single
+// request during a real test (Nob Hill, SF — a dense area that should have
+// returned plenty), which is that free shared instance being over capacity,
+// not an empty result. kumi.systems is a well-established community-run
+// mirror commonly used for exactly this kind of fallback.
+const OVERPASS_HOSTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+
+// Two groups (not one-per-kind) rather than one big union query, since a
+// single query covering all 9 amenity kinds reliably hit Overpass's own
+// server-side timeout (504, ~8-9s) in dense urban areas — confirmed against
+// Russian Hill, SF, which has enough of each amenity kind within 1500m that
+// the combined scan never finished. But four parallel groups (the previous
+// split) turned out to be one too many: the public instances only allow
+// ~2 concurrent queries per IP, and four at once reliably tripped that
+// limit — every group came back 503 together in production, not because
+// the server was down, but because all four requests landed in the same
+// instant. Two groups keeps each query fast enough on its own while
+// staying inside that concurrency limit.
 const AMENITY_QUERY_GROUPS: string[][] = [
-  [`node["leisure"="park"]`, `node["amenity"="cafe"]`],
-  [`node["amenity"="restaurant"]`, `node["amenity"~"^(bar|pub)$"]`],
-  [`node["amenity"="library"]`, `node["leisure"="fitness_centre"]`],
-  [`node["tourism"="museum"]`, `node["shop"="books"]`, `node["amenity"="cinema"]`],
+  [
+    `node["leisure"="park"]`,
+    `node["amenity"="cafe"]`,
+    `node["amenity"="restaurant"]`,
+    `node["amenity"~"^(bar|pub)$"]`,
+  ],
+  [
+    `node["amenity"="library"]`,
+    `node["leisure"="fitness_centre"]`,
+    `node["tourism"="museum"]`,
+    `node["shop"="books"]`,
+    `node["amenity"="cinema"]`,
+  ],
 ];
 
 async function fetchVenueGroup(
@@ -168,22 +192,28 @@ async function fetchVenueGroup(
   lon: number,
   radius: number
 ): Promise<any[]> {
-  try {
-    const clauses = nodeFilters.map((f) => `${f}(around:${radius},${lat},${lon});`).join('');
-    const q = `[out:json][timeout:12];(${clauses});out center 60;`;
-    const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q);
-    const res = await timedFetch(url, 12000);
-    if (!res.ok) throw new Error('overpass http ' + res.status);
-    const data = await res.json();
-    return (data && data.elements) || [];
-  } catch {
-    return [];
+  const clauses = nodeFilters.map((f) => `${f}(around:${radius},${lat},${lon});`).join('');
+  const q = `[out:json][timeout:12];(${clauses});out center 60;`;
+  const query = encodeURIComponent(q);
+  // Try each mirror in order — a 503/504 from one (the public instance
+  // being over capacity, which is common) moves on to the next rather than
+  // giving up immediately and reporting "nothing nearby."
+  for (const host of OVERPASS_HOSTS) {
+    try {
+      const res = await timedFetch(`${host}?data=${query}`, 12000);
+      if (!res.ok) continue;
+      const data = await res.json();
+      return (data && data.elements) || [];
+    } catch {
+      // network error or timeout on this host — fall through to the next mirror
+    }
   }
+  return [];
 }
 
 /** Real nearby venues across every kind WhatNow cares about, nearest-first.
- * Runs a handful of smaller Overpass queries in parallel instead of one big
- * one — see AMENITY_QUERY_GROUPS above for why. */
+ * Runs two Overpass queries in parallel (each with its own mirror fallback)
+ * instead of one big one — see AMENITY_QUERY_GROUPS above for why. */
 async function nearbyVenues(lat: number, lon: number, radius: number = 1500): Promise<NearbyVenue[]> {
   const groups = await Promise.all(
     AMENITY_QUERY_GROUPS.map((g) => fetchVenueGroup(g, lat, lon, radius))
