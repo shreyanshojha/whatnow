@@ -3,14 +3,28 @@ import React from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../components/Icon';
-import { usePlan } from '../../context/PlanContext';
+import { SavedEntry, usePlan } from '../../context/PlanContext';
 import { CATS, COST_LABEL, TIME_LABEL } from '../../data/activities';
 import { colors, font, fontDisplay, radius, shadow } from '../../lib/theme';
 
 export default function SavedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { saved, toggleSave, clearSaved } = usePlan();
+  const { saved, toggleSave, clearSaved, setMood, categories, toggleCategory, setFreeformDescription } =
+    usePlan();
+
+  // A saved activity already carries the mood it was saved under — reuse
+  // that instead of sending someone back through the mood grid to answer a
+  // question they've already answered once. Mirrors the same "fresh start"
+  // reset pick() does on the mood screen (clear stale category nudges +
+  // freeform text) so the context screen starts clean, not with leftover
+  // filters from whatever was last on the mood screen.
+  const planAgain = (entry: SavedEntry) => {
+    setFreeformDescription('');
+    for (const cat of categories) toggleCategory(cat);
+    setMood(entry.mood);
+    router.push('/home/context');
+  };
 
   const onClearAll = () => {
     Alert.alert(
@@ -50,28 +64,45 @@ export default function SavedScreen() {
     >
       <Text style={styles.sub}>Things you tucked away, kept on this device.</Text>
 
-      {saved.map((entry) => {
+      {/* Newest save first — someone who just tapped the heart on the Plan
+          screen and switches here expects to see it right at the top, not
+          buried at the bottom of a growing list. Storage order (oldest
+          first) is untouched; this only affects display. */}
+      {[...saved].reverse().map((entry) => {
         const a = entry.activity;
         const cat = CATS[a.cat];
         return (
           <View key={a.id} style={[styles.item, { borderLeftColor: cat.color }]}>
-            <View style={[styles.itemIconWrap, { backgroundColor: cat.tint }]}>
-              <Icon name={a.cat} size={17} color={cat.color} strokeWidth={1.8} />
+            <View style={styles.itemRow}>
+              <View style={[styles.itemIconWrap, { backgroundColor: cat.tint }]}>
+                <Icon name={a.cat} size={17} color={cat.color} strokeWidth={1.8} />
+              </View>
+              <View style={styles.itemBody}>
+                <Text style={styles.itemTitle}>{a.t}</Text>
+                <Text style={styles.itemMeta}>
+                  {cat.label} · {TIME_LABEL[a.time]} · {COST_LABEL[a.cost]}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => toggleSave(a)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${a.t} from saved`}
+                style={styles.remove}
+              >
+                <Text style={styles.removeText}>Remove</Text>
+              </Pressable>
             </View>
-            <View style={styles.itemBody}>
-              <Text style={styles.itemTitle}>{a.t}</Text>
-              <Text style={styles.itemMeta}>
-                {cat.label} · {TIME_LABEL[a.time]} · {COST_LABEL[a.cost]}
-              </Text>
-            </View>
+            <View style={styles.itemDivider} />
             <Pressable
-              onPress={() => toggleSave(a)}
+              onPress={() => planAgain(entry)}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`Remove ${a.t} from saved`}
-              style={styles.remove}
+              accessibilityLabel={`Plan something like ${a.t} again`}
+              style={({ pressed }) => [styles.planAgain, pressed && { opacity: 0.7 }]}
             >
-              <Text style={styles.removeText}>Remove</Text>
+              <Icon name="reset" size={13} color={colors.coralDeep} strokeWidth={2} />
+              <Text style={styles.planAgainText}>Plan again like this</Text>
             </Pressable>
           </View>
         );
@@ -92,9 +123,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 10 },
   sub: { fontSize: 15, color: colors.inkSoft, ...font.regular, marginBottom: 16 },
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     backgroundColor: colors.card,
     borderRadius: radius.md,
     borderLeftWidth: 4,
@@ -102,6 +130,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     ...shadow.soft,
   },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemDivider: { height: 1, backgroundColor: colors.line, marginTop: 12, marginBottom: 10 },
+  planAgain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  planAgainText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
   itemIconWrap: {
     width: 34,
     height: 34,
