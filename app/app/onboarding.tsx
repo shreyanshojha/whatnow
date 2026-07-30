@@ -75,7 +75,11 @@ export default function OnboardingScreen() {
   const [pageWidth, setPageWidth] = React.useState(INITIAL_WIDTH);
 
   const finish = React.useCallback(() => {
-    setCompletedOnboarding().finally(() => router.replace('/(tabs)/home'));
+    // Next stop is app/welcome.tsx (the sign-in screen), not straight to
+    // the mood picker — see that file for why sign-in belongs at the front
+    // of the experience. index.tsx handles routing straight past it for
+    // anyone who's already seen it on a later launch.
+    setCompletedOnboarding().finally(() => router.replace('/welcome'));
   }, [router]);
 
   const onCarouselLayout = (e: LayoutChangeEvent) => {
