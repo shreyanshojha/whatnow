@@ -686,15 +686,21 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       // On-device only — nothing here ever leaves the phone. See lib/locationHistory.ts.
       if (mood) addLocationVisit(mood, n?.placeName ?? null).catch(() => {});
 
-      // Live events are their own optional, bring-your-own-key layer (see
-      // lib/events.ts) — Ticketmaster is the only source right now (Google
-      // has no public events-search API to pair with its Places data).
-      if (eventsApiKey && (await canUseEventsLookupToday())) {
+      // Live events (see lib/events.ts) — Ticketmaster is the only source
+      // right now (Google has no public events-search API to pair with its
+      // Places data). BYOK, once configured, always wins over the shared
+      // beta path — same precedence as AI planning and "Look online nearby".
+      const eventsByokReady = !!eventsApiKey && (await canUseEventsLookupToday());
+      const eventsUseShared = !eventsByokReady && sharedAiAvailable;
+      if (eventsByokReady || eventsUseShared) {
         setEventsLoading(true);
-        fetchNearbyEvents(lat, lon, eventsApiKey)
+        const eventsConfig = eventsByokReady
+          ? { apiKey: eventsApiKey }
+          : { sharedAccessToken: session?.access_token };
+        fetchNearbyEvents(lat, lon, eventsConfig)
           .then((events) => {
             setNearbyEvents(events);
-            if (events.length > 0) {
+            if (events.length > 0 && eventsByokReady) {
               recordEventsLookupUse().then(refreshUsageCounts);
             }
           })
@@ -702,7 +708,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
           .finally(() => setEventsLoading(false));
       }
     },
-    [eventsApiKey, googlePlacesApiKey, mood, refreshUsageCounts]
+    [eventsApiKey, googlePlacesApiKey, mood, refreshUsageCounts, sharedAiAvailable, session]
   );
 
   const requestLocation = useCallback((): Promise<void> => {

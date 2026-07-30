@@ -264,12 +264,17 @@ export default function AboutScreen() {
         <Text style={styles.cardP}>
           Two separate, independent upgrades — add either, both, or neither.{'\n\n'}
           <Text style={font.semibold}>Ticketmaster: </Text>
-          real concerts, shows, and games show up in "Nearby right now."{'\n\n'}
+          real concerts, shows, and games show up in "Nearby right now."{' '}
+          {sharedAiAvailable
+            ? "Already working automatically while you're signed in, with a fair shared daily " +
+              'cap — add your own key below only if you want your own limits instead.'
+            : ''}
+          {'\n\n'}
           <Text style={font.semibold}>Google Places: </Text>
           sharper, more complete nearby-spot names than the free OpenStreetMap data WhatNow
           uses by default.{'\n\n'}
-          Both keys stay on this device, sent straight to their own provider. Ticketmaster
-          lookups are capped at {MAX_EVENTS_LOOKUPS_PER_DAY}/day.
+          Your own key (if you add one) stays on this device, sent straight to Ticketmaster —
+          never through our servers. Capped at {MAX_EVENTS_LOOKUPS_PER_DAY}/day.
         </Text>
         <TextInput
           value={eventsKeyDraft}
