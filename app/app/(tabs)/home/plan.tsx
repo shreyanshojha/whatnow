@@ -42,6 +42,8 @@ export default function PlanScreen() {
     eventsLoading,
     nearbySearchResults,
     nearbySearchLoading,
+    nearbySearchNote,
+    nearbySearchErrorReason,
     lookOnlineNearby,
     aiApiKey,
     sharedAiAvailable,
@@ -186,6 +188,8 @@ export default function PlanScreen() {
         <LookOnlineNearby
           results={nearbySearchResults}
           loading={nearbySearchLoading}
+          note={nearbySearchNote}
+          errorReason={nearbySearchErrorReason}
           onSearch={lookOnlineNearby}
         />
       ) : null}
@@ -322,13 +326,26 @@ const GENRE_CHIPS = ['Comedy', 'Action', 'Drama', 'Family-friendly', 'Horror', '
  * all) via the same Anthropic key used for AI planning (see
  * lib/nearbySearch.ts). Starts collapsed as a single button so it never
  * looks like a broken, empty section. */
+/** Human-friendly copy for a genuine technical failure — distinct from the
+ * model's own "nothing qualifies right now" note, which is shown verbatim
+ * instead (see ERROR_REASON_LABEL's usage below). */
+const ERROR_REASON_LABEL: Record<'timeout' | 'network' | 'unreadable', string> = {
+  timeout: "The search took longer than expected and timed out — try again.",
+  network: "Couldn't reach the search just now — try again in a bit.",
+  unreadable: "Got an odd response back — try again.",
+};
+
 function LookOnlineNearby({
   results,
   loading,
+  note,
+  errorReason,
   onSearch,
 }: {
   results: ReturnType<typeof usePlan>['nearbySearchResults'];
   loading: boolean;
+  note: string | null;
+  errorReason: 'timeout' | 'network' | 'unreadable' | null;
   onSearch: (refineHint?: string) => Promise<void>;
 }) {
   const [searched, setSearched] = React.useState(false);
@@ -402,10 +419,22 @@ function LookOnlineNearby({
         </Text>
       ) : results === null ? (
         <Text style={styles.lookHint}>
-          Couldn't find anything just now — try again in a bit.
+          {errorReason ? ERROR_REASON_LABEL[errorReason] : "Couldn't find anything just now — try again in a bit."}
         </Text>
       ) : (
         <>
+          {note ? (
+            <View style={styles.noteRow}>
+              <Icon name="info" size={13} color={colors.inkFaint} strokeWidth={1.9} />
+              <Text style={styles.noteText}>{note}</Text>
+            </View>
+          ) : null}
+          {results.length === 0 && !note ? (
+            <Text style={styles.lookHint}>
+              Nothing real turned up nearby right now — try again later, or widen the radius in
+              Settings.
+            </Text>
+          ) : null}
           {presentCats.length > 1 ? (
             <View style={styles.lookFilterRow}>
               {(['all', ...presentCats] as const).map((f) => (
@@ -554,6 +583,17 @@ const styles = StyleSheet.create({
   },
   lookBtnText: { fontSize: 12.5, ...font.semibold, color: colors.coralDeep },
   lookHint: { fontSize: 13, color: colors.inkFaint, ...font.regular, lineHeight: 19 },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: colors.bg2,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  noteText: { flex: 1, fontSize: 12.5, color: colors.inkSoft, ...font.regular, lineHeight: 18 },
   lookFilterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   lookFilterChip: {
     borderRadius: radius.pill,

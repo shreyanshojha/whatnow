@@ -84,7 +84,32 @@ const VALID_ENERGY = new Set<Energy>(['low', 'medium', 'high']);
 const VALID_PLACE = new Set<Place>(['indoor', 'outdoor', 'either']);
 const VALID_COST = new Set<Cost>(['free', 'cheap', 'treat']);
 const VALID_SOCIAL = new Set<Social>(['solo', 'someone', 'group']);
-const VALID_TIME = new Set<TimeVal>([15, 60, 240]);
+const TIME_BUCKETS: TimeVal[] = [15, 60, 240];
+
+/** Live-verified failure mode (production, 2026-07): despite the prompt
+ * stating "time" must be exactly 15, 60, or 240, the model routinely
+ * returns realistic-but-off-grid estimates instead ("time": 20, 25, 90 —
+ * confirmed in a real ai-proxy response). Strict-equality validation
+ * dropped every one of those, and 3 of 4 suggestions failing at once
+ * regularly took the whole batch below the "at least 2 valid" bar,
+ * silently falling all the way back to the static 117-activity engine —
+ * the root cause of AI plans feeling rare/generic. Snapping to the
+ * nearest bucket (then capping to what's actually available) keeps the
+ * suggestion instead of discarding it over a rounding difference. */
+function normalizeTimeBucket(raw: number, cap: TimeVal): TimeVal {
+  let nearest: TimeVal = TIME_BUCKETS[0];
+  let bestDiff = Math.abs(raw - nearest);
+  for (const b of TIME_BUCKETS) {
+    const diff = Math.abs(raw - b);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      nearest = b;
+    }
+  }
+  const capIdx = TIME_BUCKETS.indexOf(cap);
+  const nearestIdx = TIME_BUCKETS.indexOf(nearest);
+  return nearestIdx > capIdx ? cap : nearest;
+}
 
 export interface NearbyVenueName {
   name: string;
@@ -209,19 +234,28 @@ function buildPrompt(
       `the point of this app.`
   );
   lines.push(
+    `If a suggestion involves watching something, name a specific, real, well-known movie or ` +
+      `show you're genuinely confident exists — "watch Cast Away" beats "watch a movie." You ` +
+      `can't check what's currently streaming where they are, so don't claim a specific ` +
+      `platform or claim it's new/trending — just make sure it's a real, good, specific title ` +
+      `rather than a vague genre.`
+  );
+  lines.push(
     `Vary the category across suggestions where you can. Valid categories: ` +
       `${Array.from(VALID_CATS).join(', ')}.`
   );
   lines.push(
     `Respond with ONLY a JSON array, no prose, no markdown fences. Each element:\n` +
       `{"t": "short title", "d": "one-sentence description", "cat": "<category>", ` +
-      `"e": "low|medium|high", "time": ${Array.from(VALID_TIME).join('|')}, ` +
+      `"e": "low|medium|high", "time": ${TIME_BUCKETS.join('|')}, ` +
       `"soc": ["solo"|"someone"|"group", ...], "place": "indoor|outdoor|either", ` +
       `"cost": "free|cheap|treat", "why": {"${input.mood}": "the why line"}}`
   );
   lines.push(
-    `"time" must be less than or equal to ${input.time}. "cost" must not exceed the stated ` +
-      `budget. "soc" must include "${input.social}".`
+    `"time" MUST be exactly one of ${TIME_BUCKETS.join(', ')} — not a realistic estimate like ` +
+      `20 or 90, one of those three literal numbers, whichever is the closest fit and no ` +
+      `greater than ${input.time}. "cost" must not exceed the stated budget. "soc" must ` +
+      `include "${input.social}".`
   );
   return lines.join('\n');
 }
@@ -267,18 +301,35 @@ function validateActivity(raw: unknown, input: PlanInput): Activity | null {
 
   if (typeof a.t !== 'string' || !a.t.trim()) return null;
   if (typeof a.d !== 'string' || !a.d.trim()) return null;
-  if (typeof a.cat !== 'string' || !VALID_CATS.has(a.cat as CatId)) return null;
-  if (typeof a.e !== 'string' || !VALID_ENERGY.has(a.e as Energy)) return null;
-  if (typeof a.time !== 'number' || !VALID_TIME.has(a.time as TimeVal)) return null;
-  if ((a.time as number) > input.time) return null; // must fit the window, like the engine
+
+  // Normalize case/whitespace defensively before checking against the enum
+  // sets below — the model is given the exact literal values to use, but
+  // the occasional stray capital or trailing space shouldn't be enough to
+  // discard an otherwise-good suggestion (see normalizeTimeBucket's comment
+  // for the live-verified version of this same class of problem).
+  const catRaw = typeof a.cat === 'string' ? a.cat.trim().toLowerCase() : '';
+  if (!VALID_CATS.has(catRaw as CatId)) return null;
+  const eRaw = typeof a.e === 'string' ? (a.e.trim().toLowerCase() as Energy) : null;
+  if (!eRaw || !VALID_ENERGY.has(eRaw)) return null;
+
+  if (typeof a.time !== 'number' || !Number.isFinite(a.time) || a.time <= 0) return null;
+  const normalizedTime = normalizeTimeBucket(a.time, input.time);
+
   if (!Array.isArray(a.soc) || a.soc.length === 0) return null;
-  if (!a.soc.every((s) => typeof s === 'string' && VALID_SOCIAL.has(s as Social))) return null;
-  if (!(a.soc as string[]).includes(input.social)) return null;
-  if (typeof a.place !== 'string' || !VALID_PLACE.has(a.place as Place)) return null;
-  if (input.setting !== 'either' && a.place !== 'either' && a.place !== input.setting) return null;
-  if (typeof a.cost !== 'string' || !VALID_COST.has(a.cost as Cost)) return null;
-  if (COST[a.cost as Cost] > COST[input.budget]) return null;
-  if (E[a.e as Energy] - E[input.energy] >= 2) return null; // never wildly above stated energy
+  const socRaw = a.soc
+    .filter((s): s is string => typeof s === 'string')
+    .map((s) => s.trim().toLowerCase()) as Social[];
+  if (socRaw.length === 0 || !socRaw.every((s) => VALID_SOCIAL.has(s))) return null;
+  if (!socRaw.includes(input.social)) return null;
+
+  const placeRaw = typeof a.place === 'string' ? (a.place.trim().toLowerCase() as Place) : null;
+  if (!placeRaw || !VALID_PLACE.has(placeRaw)) return null;
+  if (input.setting !== 'either' && placeRaw !== 'either' && placeRaw !== input.setting) return null;
+
+  const costRaw = typeof a.cost === 'string' ? (a.cost.trim().toLowerCase() as Cost) : null;
+  if (!costRaw || !VALID_COST.has(costRaw)) return null;
+  if (COST[costRaw] > COST[input.budget]) return null;
+  if (E[eRaw] - E[input.energy] >= 2) return null; // never wildly above stated energy
 
   let why: Partial<Record<MoodId, string>> = {};
   if (a.why && typeof a.why === 'object') {
@@ -298,13 +349,13 @@ function validateActivity(raw: unknown, input: PlanInput): Activity | null {
     kidFriendly: true,
     t: (a.t as string).trim(),
     d: (a.d as string).trim(),
-    cat: a.cat as CatId,
+    cat: catRaw as CatId,
     moods: [input.mood],
-    e: a.e as Energy,
-    time: a.time as TimeVal,
-    soc: a.soc as Social[],
-    place: a.place as Place,
-    cost: a.cost as Cost,
+    e: eRaw,
+    time: normalizedTime,
+    soc: socRaw,
+    place: placeRaw,
+    cost: costRaw,
     why,
   };
 }

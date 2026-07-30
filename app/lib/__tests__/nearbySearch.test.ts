@@ -35,11 +35,32 @@ describe('searchNearby', () => {
     expect(result).toBeNull();
   });
 
-  it('parses a valid response spanning all four categories', async () => {
+  it('parses a valid response spanning all four categories (bare-array shape)', async () => {
     mockAnthropicResponse([textBlock(JSON.stringify(VALID_RESULTS))]);
     const result = await searchNearby({ apiKey: 'test-key' }, 'Nob Hill, San Francisco');
     expect(result).not.toBeNull();
-    expect(result!.map((r) => r.category).sort()).toEqual(['discover', 'event', 'movie', 'restaurant']);
+    expect(result!.results.map((r) => r.category).sort()).toEqual(['discover', 'event', 'movie', 'restaurant']);
+    expect(result!.note).toBeNull();
+  });
+
+  it('parses the {note, results} object shape and surfaces the note', async () => {
+    mockAnthropicResponse([
+      textBlock(JSON.stringify({ note: "It's 3am — most places nearby are closed.", results: VALID_RESULTS })),
+    ]);
+    const result = await searchNearby({ apiKey: 'test-key' });
+    expect(result).not.toBeNull();
+    expect(result!.note).toBe("It's 3am — most places nearby are closed.");
+    expect(result!.results.length).toBe(4);
+  });
+
+  it('treats a valid, empty results array with a note as a real (non-null) answer', async () => {
+    mockAnthropicResponse([
+      textBlock(JSON.stringify({ note: 'Nothing is open this late nearby.', results: [] })),
+    ]);
+    const result = await searchNearby({ apiKey: 'test-key' });
+    expect(result).not.toBeNull();
+    expect(result!.results).toEqual([]);
+    expect(result!.note).toBe('Nothing is open this late nearby.');
   });
 
   it('joins interleaved text blocks (as web-search tool use produces) before parsing', async () => {
@@ -51,15 +72,16 @@ describe('searchNearby', () => {
     ]);
     const result = await searchNearby({ apiKey: 'test-key' });
     expect(result).not.toBeNull();
-    expect(result!.length).toBe(2);
+    expect(result!.results.length).toBe(2);
   });
 
-  it('rejects a result with an invalid category', async () => {
+  it('drops an invalid-category result but still returns a real (non-null) outcome', async () => {
     mockAnthropicResponse([
       textBlock(JSON.stringify([{ ...VALID_RESULTS[0], category: 'not-a-real-category' }])),
     ]);
     const result = await searchNearby({ apiKey: 'test-key' });
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.results.length).toBe(0);
   });
 
   it('drops a fabricated-looking url but keeps the result', async () => {
@@ -68,25 +90,43 @@ describe('searchNearby', () => {
     ]);
     const result = await searchNearby({ apiKey: 'test-key' });
     expect(result).not.toBeNull();
-    expect(result![0].url).toBeNull();
+    expect(result!.results[0].url).toBeNull();
   });
 
-  it('returns null for a non-JSON reply', async () => {
+  it('returns null for a non-JSON reply and reports an "unreadable" error', async () => {
     mockAnthropicResponse([textBlock('Sorry, I could not find anything specific.')]);
-    const result = await searchNearby({ apiKey: 'test-key' });
+    const onError = jest.fn();
+    const result = await searchNearby({ apiKey: 'test-key' }, null, undefined, undefined, onError);
     expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('unreadable');
   });
 
-  it('returns null on a non-ok HTTP response', async () => {
+  it('returns null on a non-ok HTTP response and reports a "network" error', async () => {
     mockAnthropicResponse([textBlock('irrelevant')], false);
-    const result = await searchNearby({ apiKey: 'test-key' });
+    const onError = jest.fn();
+    const result = await searchNearby({ apiKey: 'test-key' }, null, undefined, undefined, onError);
     expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('network');
   });
 
-  it('returns null on a network failure', async () => {
+  it('returns null on a network failure and reports a "network" error', async () => {
     (globalThis as any).fetch = jest.fn().mockRejectedValue(new Error('network down'));
-    const result = await searchNearby({ apiKey: 'test-key' });
+    const onError = jest.fn();
+    const result = await searchNearby({ apiKey: 'test-key' }, null, undefined, undefined, onError);
     expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('network');
+  });
+
+  it('reports a "timeout" error on an aborted request', async () => {
+    (globalThis as any).fetch = jest.fn().mockImplementation(() => {
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      return Promise.reject(err);
+    });
+    const onError = jest.fn();
+    const result = await searchNearby({ apiKey: 'test-key' }, null, undefined, undefined, onError);
+    expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('timeout');
   });
 
   it('passes a refineHint through without throwing (prompt content is not asserted here)', async () => {

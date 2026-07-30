@@ -161,6 +161,16 @@ interface PlanContextValue {
   // "Look online nearby" web search (optional, bring-your-own-key — same key as AI planning)
   nearbySearchResults: NearbyResult[] | null;
   nearbySearchLoading: boolean;
+  /** The model's own short comment on the last successful search's results
+   * — e.g. explaining why the list is thin or empty at this hour. Null
+   * whenever there's nothing worth flagging, or no search has run yet. */
+  nearbySearchNote: string | null;
+  /** Set only when the last search failed for a genuine technical reason
+   * (timeout, network, unreadable response) rather than the model simply
+   * finding nothing — lets the UI say what actually went wrong instead of
+   * one generic "couldn't find anything" for every failure mode. Cleared
+   * at the start of every new search attempt. */
+  nearbySearchErrorReason: 'timeout' | 'network' | 'unreadable' | null;
   /** `refineHint` — a follow-up preference from a second-round question the
    * Plan screen asks after the first search comes back (e.g. "Italian
    * food"). Omitted for the first search. See lib/nearbySearch.ts. */
@@ -254,6 +264,10 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [nearbySearchResults, setNearbySearchResults] = useState<NearbyResult[] | null>(null);
   const [nearbySearchLoading, setNearbySearchLoading] = useState(false);
+  const [nearbySearchNote, setNearbySearchNote] = useState<string | null>(null);
+  const [nearbySearchErrorReason, setNearbySearchErrorReason] = useState<
+    'timeout' | 'network' | 'unreadable' | null
+  >(null);
   const [sharedAiCapped, setSharedAiCapped] = useState(false);
 
   const [lastPlan, setLastPlan] = useState<PlanCard[]>([]);
@@ -619,24 +633,32 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     const useShared = !byokReady && sharedAiAvailable;
     if (!byokReady && !useShared) {
       setNearbySearchResults(null);
+      setNearbySearchNote(null);
+      setNearbySearchErrorReason(null);
       return;
     }
     setNearbySearchLoading(true);
+    // Reset every attempt so a stale note/error/capped notice from a
+    // previous search never lingers into this one's result.
+    setNearbySearchNote(null);
+    setNearbySearchErrorReason(null);
     try {
       let cappedThisAttempt = false;
       const config = byokReady ? { apiKey: aiApiKey } : { sharedAccessToken: session?.access_token };
-      const results = await searchNearby(
+      const outcome = await searchNearby(
         config,
         nearbyRef.current?.placeName ?? null,
         useShared ? () => { cappedThisAttempt = true; } : undefined,
-        refineHint
+        refineHint,
+        (reason) => setNearbySearchErrorReason(reason)
       );
-      setNearbySearchResults(results);
+      setNearbySearchResults(outcome ? outcome.results : null);
+      setNearbySearchNote(outcome?.note ?? null);
       // Always reset, not just on the shared path — otherwise a stale
       // "you're capped" notice from an earlier shared-path attempt could
       // survive into a request that actually used a BYOK key.
       setSharedAiCapped(useShared && cappedThisAttempt);
-      if (results && byokReady) {
+      if (outcome && byokReady) {
         await recordNearbySearchUse();
         refreshUsageCounts();
       }
@@ -866,6 +888,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     eventsLoading,
     nearbySearchResults,
     nearbySearchLoading,
+    nearbySearchNote,
+    nearbySearchErrorReason,
     lookOnlineNearby,
     lastPlan,
     planSource,

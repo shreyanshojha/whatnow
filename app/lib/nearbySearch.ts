@@ -42,6 +42,20 @@ export interface NearbyResult {
   url: string | null;
 }
 
+/** What searchNearby actually hands back on a successful call — always
+ * includes `note`, the model's own short, plain-language comment on the
+ * results (e.g. "It's 2am, so most kitchens are closed — these are what's
+ * still open" or "Not much is open this late, but here's what is"). Live
+ * testing showed the previous "just a bare array, or null" contract left
+ * the UI with nothing to say beyond a generic "couldn't find anything" any
+ * time real-world results were thin — which reads as broken rather than
+ * honest about why. `results` can legitimately be empty while `note` still
+ * explains what's going on (e.g. genuinely nothing is open right now). */
+export interface NearbySearchOutcome {
+  results: NearbyResult[];
+  note: string | null;
+}
+
 export interface NearbySearchConfig {
   /** Bring-your-own-key path: set this to call Anthropic directly. Takes
    * precedence over `sharedAccessToken` if both are set. */
@@ -57,7 +71,14 @@ export interface NearbySearchConfig {
 }
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
-const DEFAULT_TIMEOUT = 25000;
+// Live-verified (production, 2026-07): the shared beta path always uses a
+// server-decided model (currently Sonnet, not the Haiku default above —
+// see beta_ai_config), and a web-search tool-use loop through it routinely
+// runs several searches before composing a final answer. 25s was cutting
+// that off mid-search on a majority of real attempts — the "only worked
+// once out of four tries" the search feature was reported to do. 45s gives
+// a multi-search Sonnet call real room to finish instead of racing it.
+const DEFAULT_TIMEOUT = 45000;
 // Each search is billed to the person's own key (~$10/1,000 searches +
 // tokens) — keep a single request's blast radius small and predictable.
 const MAX_SEARCHES = 4;
@@ -95,7 +116,11 @@ function buildPrompt(placeName: string | null, nowLabel: string, refineHint?: st
   );
   lines.push(
     `Find 6 to 9 results spread across a real MIX of these four kinds — don't let it collapse ` +
-      `into just one or two:`
+      `into mostly one kind (restaurants are the easiest to find, so it's tempting to lean on ` +
+      `them; actively resist that). As a target: no more than 3 of the total should be ` +
+      `restaurants, and genuinely try to include at least one each of event, movie, and ` +
+      `discover if anything real and current qualifies. It's fine to end up with zero of a kind ` +
+      `if nothing legitimately fits right now — never invent one just to fill a quota.`
   );
   lines.push(
     `- "restaurant": a specific, real restaurant, food stall, or food hall worth trying right ` +
@@ -132,29 +157,65 @@ function buildPrompt(placeName: string | null, nowLabel: string, refineHint?: st
       `genuine one — never invent or guess a URL).`
   );
   lines.push(
-    `Respond with ONLY a JSON array of objects with those four fields — no prose, no markdown ` +
-      `code fences, nothing before or after the array.`
+    `Also include a short "note" — one plain sentence of real context about these results, or ` +
+      `null if there's nothing worth flagging. Use it especially when time of day is limiting ` +
+      `what's actually available (e.g. "It's the middle of the night, so most kitchens are ` +
+      `closed — these are what's still open" or "Not much is happening this early, but here's ` +
+      `what's open"), or when you genuinely couldn't find much nearby at all (say so plainly ` +
+      `rather than letting a thin list speak for itself). Never use it to apologize or pad — ` +
+      `only when it actually explains something about why the list looks the way it does.`
+  );
+  lines.push(
+    `Respond with ONLY a JSON object, no prose, no markdown code fences: ` +
+      `{"note": "one sentence or null", "results": [ ...the result objects above... ]}. ` +
+      `"results" can be an empty array if truly nothing real qualifies right now — that's a ` +
+      `valid, honest answer, not a failure; explain why in "note" when that happens.`
   );
   return lines.join('\n');
 }
 
-function extractJsonArray(text: string): unknown[] | null {
-  try {
-    const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) return parsed;
+/** Extracts `{ note, results }` from the model's text — tolerant of stray
+ * prose/markdown fences around the object (extractJsonArray in lib/aiPlan.ts
+ * takes the same defensive approach). Falls back to treating the whole
+ * thing as a bare array (the pre-`note` response shape) so a model that
+ * ignores the object-wrapping instruction still degrades gracefully
+ * instead of losing the results entirely. */
+function extractResponse(text: string): { note: string | null; results: unknown[] } | null {
+  const tryParse = (s: string): { note: string | null; results: unknown[] } | null => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(s);
+    } catch {
+      return null;
+    }
+    if (Array.isArray(parsed)) return { note: null, results: parsed };
+    if (parsed && typeof parsed === 'object') {
+      const o = parsed as Record<string, unknown>;
+      const results = Array.isArray(o.results) ? o.results : null;
+      if (!results) return null;
+      const note = typeof o.note === 'string' && o.note.trim() ? o.note.trim().slice(0, 200) : null;
+      return { note, results };
+    }
     return null;
-  } catch {
-    // Fall through to a looser extraction below.
+  };
+
+  const direct = tryParse(text);
+  if (direct) return direct;
+
+  // Loosest fallback: grab the outermost {...} or [...] in the text.
+  const objStart = text.indexOf('{');
+  const objEnd = text.lastIndexOf('}');
+  if (objStart !== -1 && objEnd > objStart) {
+    const viaObj = tryParse(text.slice(objStart, objEnd + 1));
+    if (viaObj) return viaObj;
   }
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    const parsed = JSON.parse(text.slice(start, end + 1));
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
+  const arrStart = text.indexOf('[');
+  const arrEnd = text.lastIndexOf(']');
+  if (arrStart !== -1 && arrEnd > arrStart) {
+    const viaArr = tryParse(text.slice(arrStart, arrEnd + 1));
+    if (viaArr) return viaArr;
   }
+  return null;
 }
 
 const VALID_RESULT_CATS = new Set(['event', 'movie', 'restaurant', 'discover']);
@@ -180,9 +241,12 @@ function validateResult(raw: unknown): NearbyResult | null {
 /**
  * Ask Claude to search the web for real, currently-open/happening nearby
  * things — restaurants, events, movies, and general "didn't know this was
- * here" discoveries (see buildPrompt). Returns null on any failure — no
- * key, network error, timeout, or a response that doesn't parse into at
- * least one valid result. Never throws.
+ * here" discoveries (see buildPrompt). Returns null only on a genuine
+ * technical failure — no key, network error, timeout, or a response that
+ * doesn't parse at all. A real answer from the model — even "nothing
+ * qualifies right now, here's why" — comes back as an outcome with an
+ * empty `results` array and a `note` explaining it, not null; see
+ * NearbySearchOutcome. Never throws.
  */
 export async function searchNearby(
   config: NearbySearchConfig,
@@ -195,8 +259,14 @@ export async function searchNearby(
    * asked after the first search came back — e.g. "Italian food" if a
    * restaurant result showed up, or "something funny" for a movie result.
    * See plan.tsx's LookOnlineNearby. Undefined for the first search. */
-  refineHint?: string
-): Promise<NearbyResult[] | null> {
+  refineHint?: string,
+  /** Called on a genuine technical failure (never on a valid "zero real
+   * results" answer from the model — that goes through the normal return
+   * value with a `note` instead) so the UI can tell "the search itself
+   * broke" apart from "the model looked and found nothing," which used to
+   * both read as the same unhelpful "couldn't find anything" message. */
+  onError?: (reason: 'timeout' | 'network' | 'unreadable') => void
+): Promise<NearbySearchOutcome | null> {
   const hasByok = !!config.apiKey && !!config.apiKey.trim();
   const hasShared = !!config.sharedAccessToken && !!config.sharedAccessToken.trim();
   if (!hasByok && !hasShared) return null;
@@ -254,6 +324,7 @@ export async function searchNearby(
 
     if (!res.ok) {
       if (hasShared && res.status === 429) onCapped?.();
+      else onError?.('network');
       return null;
     }
     const data = await res.json();
@@ -269,13 +340,16 @@ export async function searchNearby(
       .map((b) => b.text)
       .join('\n');
 
-    const rawArr = extractJsonArray(text);
-    if (!rawArr) return null;
+    const parsed = extractResponse(text);
+    if (!parsed) {
+      onError?.('unreadable');
+      return null;
+    }
 
-    const valid = rawArr.map(validateResult).filter((r): r is NearbyResult => r !== null);
-    if (valid.length === 0) return null;
-    return valid.slice(0, 8);
-  } catch {
+    const valid = parsed.results.map(validateResult).filter((r): r is NearbyResult => r !== null);
+    return { results: valid.slice(0, 8), note: parsed.note };
+  } catch (e) {
+    onError?.(e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'network');
     return null; // network error, timeout (AbortError), or unexpected shape
   } finally {
     clearTimeout(timer);

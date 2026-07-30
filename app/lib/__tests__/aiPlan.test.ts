@@ -77,12 +77,47 @@ describe('generateAiPlan', () => {
     expect(result).toBeNull();
   });
 
-  it('rejects an activity whose time exceeds the available window', async () => {
+  it('clamps an activity time that exceeds the available window down to fit, instead of rejecting it', async () => {
+    // Live-verified (production): the model routinely ignores the "must be
+    // 15/60/240" instruction and returns realistic-but-off-grid estimates
+    // (20, 25, 90...). Rejecting those outright was silently discarding
+    // most real AI-composed plans and falling back to the generic static
+    // engine — see normalizeTimeBucket's doc comment in aiPlan.ts.
     mockAnthropicResponse(
       JSON.stringify([{ ...VALID_ITEM, time: 240 }, { ...VALID_ITEM, t: 'Second' }])
     );
     const result = await generateAiPlan(baseInput({ time: 15 }), { apiKey: 'test-key' });
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result![0].time).toBe(15);
+  });
+
+  it('snaps an off-grid time estimate to the nearest valid bucket instead of rejecting it', async () => {
+    mockAnthropicResponse(
+      JSON.stringify([
+        { ...VALID_ITEM, time: 20 },
+        { ...VALID_ITEM, t: 'Second', time: 25 },
+      ])
+    );
+    const result = await generateAiPlan(baseInput({ time: 60 }), { apiKey: 'test-key' });
+    expect(result).not.toBeNull();
+    expect(result!.every((a) => [15, 60, 240].includes(a.time))).toBe(true);
+  });
+
+  it('normalizes case/whitespace in enum fields instead of rejecting them', async () => {
+    mockAnthropicResponse(
+      JSON.stringify([
+        { ...VALID_ITEM, cat: ' Move ', e: 'MEDIUM', place: 'Outdoor', cost: 'Free', soc: [' Solo '] },
+        { ...VALID_ITEM, t: 'Second' },
+      ])
+    );
+    const result = await generateAiPlan(baseInput({ setting: 'outdoor', budget: 'treat' }), {
+      apiKey: 'test-key',
+    });
+    expect(result).not.toBeNull();
+    expect(result![0].cat).toBe('move');
+    expect(result![0].place).toBe('outdoor');
+    expect(result![0].cost).toBe('free');
+    expect(result![0].soc).toEqual(['solo']);
   });
 
   it('rejects an activity missing a why-line for the current mood', async () => {
